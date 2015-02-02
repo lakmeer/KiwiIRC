@@ -40,6 +40,8 @@ if (!require('./configloader.js')()) {
 }
 
 var source_files = [
+
+    // Models
     global.config.public_http + '/src/app.js',
     global.config.public_http + '/src/models/application.js',
     global.config.public_http + '/src/models/gateway.js',
@@ -58,6 +60,11 @@ var source_files = [
     global.config.public_http + '/src/models/datastore.js',
     global.config.public_http + '/src/models/channelinfo.js',
 
+    // LMW custom models
+    global.config.public_http + '/src/models/mediastream.js',
+    global.config.public_http + '/src/models/medialist.js',
+
+    // Views
     global.config.public_http + '/src/views/panel.js',
     global.config.public_http + '/src/views/channel.js',
     global.config.public_http + '/src/views/applet.js',
@@ -81,6 +88,9 @@ var source_files = [
     global.config.public_http + '/src/views/channelinfo.js',
     global.config.public_http + '/src/views/rightbar.js',
     global.config.public_http + '/src/views/notification.js',
+
+    // LMW custom views
+    global.config.public_http + '/src/views/medialist.js',
 
     global.config.public_http + '/src/misc/clientuicommands.js',
 

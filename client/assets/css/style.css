@@ -5,10 +5,10 @@ html, body { height:100%; }
 
 /* Few resets for within the kiwi container */
 #kiwi {
-    overflow:hidden; position:relative;
-    height:100%;
+  overflow:hidden; position:relative;
+  height:100%;
 }
-#kiwi * { margin:0px; padding:0px; }
+#kiwi * { margin:0px; padding:0px; box-sizing: border-box; }
 #kiwi p { margin:0.5em 0; }
 #kiwi a { color:#36C; text-decoration:none; cursor:pointer; }
 #kiwi a img { border:none; }
@@ -17,14 +17,14 @@ html, body { height:100%; }
 #kiwi h1,
 #kiwi h2,
 #kiwi h3 {
-    margin-top: 22px;
-    margin-bottom: 11px;
+  margin-top: 22px;
+  margin-bottom: 11px;
 }
 #kiwi h4,
 #kiwi h5,
 #kiwi h6 {
-    margin-top: 11px;
-    margin-bottom: 11px;
+  margin-top: 11px;
+  margin-bottom: 11px;
 }
 #kiwi h1 { font-size: 46px; }
 #kiwi h2 { font-size: 40px; }
@@ -40,18 +40,18 @@ html, body { height:100%; }
 #kiwi .toolbar { position:absolute; top:0px; width:100%; display:none; z-index:1; }
 #kiwi .panels { position:absolute; left:0px; right:200px; bottom:100px; top:100px; }
 #kiwi .right_bar { position:absolute; right:0px; width:200px; bottom:100px; top:100px; overflow:visible; }
-#kiwi .right-bar-content { position:relative; height:100%; z-index:0; }
+#kiwi .right-bar-content { position:relative; height:100%; z-index:0; padding-top: 1px; /* stop silly margin doings */ }
 #kiwi .controlbox { position: absolute; bottom:0px; width:100%; display:none; }
 #kiwi .memberlists_resize_handle {
     position: absolute; width:10px; z-index:1; cursor:w-resize;
 }
-
 
 #kiwi .toolbar .tabs { margin-right: 200px; overflow: hidden; }
 #kiwi .toolbar .panellist {
     overflow: hidden;
     display:block;
 }
+
 #kiwi .toolbar .panellist li {
     float: left; list-style: none;
     display:inline; position:relative;
@@ -88,13 +88,16 @@ html, body { height:100%; }
 
 #kiwi .channel_tools {
     position: absolute;
+    text-align: center;
     top: 0;
     left: 0;
     width: 100%;
     z-index: 1;
+    white-space: nowrap;
 }
+
 #kiwi .channel_tools i {
-    width: 32%;
+    width: 18%;
     display: inline-block;
     text-align: center;
     cursor: pointer;
@@ -137,10 +140,21 @@ html, body { height:100%; }
 #kiwi .messages .msg .media .media_content { white-space: normal; }
 
 
+/*
+ * Sidebar Mechanix
+ *
+ */
+
 #kiwi .right_bar { border-left: 1px solid #8A8A8A; }
+
 #kiwi .right_bar.disabled { width:0; }
+
 #kiwi .right_bar.disabled .channel_tools,
-#kiwi .right_bar.disabled .memberlists { display:none; }
+#kiwi .right_bar.disabled .sidepanels { display:none; }
+
+#kiwi .right_bar[data-sidepanel="media"] .memberlists { display: none; }
+#kiwi .right_bar[data-sidepanel="users"] .medialist   { display: none; }
+
 
 #kiwi .right-bar-toggle {
     position: absolute;
@@ -169,18 +183,25 @@ html, body { height:100%; }
     border-bottom-right-radius: 500px;
 }
 
-/* The active channels nicklist */
-#kiwi .memberlists {
-    position: absolute;
-    left: 0;
-    bottom: 0;
-    top: 0;
-    width: 100%;
-    overflow-y: auto;
-    padding-top: 50px;
+
+/* The Sidepanel - now inherits most of the styles of the memberlist */
+
+#kiwi .sidepanel {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  top: 36px;
+  width: 100%;
+  overflow-y: auto;
 }
+
+
+/* The active channels nicklist (styles are now the vanilla sidepanel) */
+#kiwi .memberlists { }
+
 #kiwi .memberlists > div { display:none; }
 #kiwi .memberlists > div.active { display:block; }
+
 #kiwi .memberlists ul li { overflow-y:auto; overflow-x:hidden; cursor:pointer; }
 #kiwi .memberlists ul li a.nick { }
 
@@ -464,12 +485,8 @@ html, body { height:100%; }
 
 
 
-
-
-
-
 /**
- * Reusable componants
+ * Reusable components
  */
 
 #kiwi .divider-verticle {
@@ -490,16 +507,11 @@ html, body { height:100%; }
     height:0;
 }
 
-
-
 #kiwi .loader {
     background:url(../img/loader.gif) no-repeat;
     width:43px; height:11px;
     display:inline-block;
 }
-
-
-
 
 #kiwi .ui_menu {
     padding: 0;
@@ -553,3 +565,84 @@ html, body { height:100%; }
     cursor:pointer;
     width: 40px;
 }
+
+
+/*
+ * Non-Media Layer Extensions
+ *
+ */
+
+
+/* Loading message */
+
+.loading {
+  z-index: 0;
+  text-align: center;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.loading .message {
+  top: 200px;
+  background: #cf8b54;
+  padding: 20px 40px;
+  border-radius: 5px;
+  display: inline-block;
+  vertical-align: middle;
+  color: white;
+  box-shadow: 4px 4px 10px rgba(0,0,0,0.4);
+}
+
+.loading:after {
+  content: "";
+  margin-left: -0.25em;
+  position: relative;
+  display: inline-block;
+  height: 100%;
+  vertical-align: middle;
+}
+
+
+
+/*
+ * Media Layer Features
+ *
+ */
+
+#kiwi .medialist {
+
+}
+
+#kiwi .medialist .meta {
+  margin: 0;
+  text-align: center;
+
+}
+
+#kiwi .medialist .meta .title {
+  font-weight: bold;
+  font-size: 1.2em;
+  margin-top: 0;
+  margin-bottom: 0.5em;
+}
+
+#kiwi .medialist .meta .status {
+  font-size: 0.9em;
+}
+
+#kiwi .medialist .meta .status.no-rx-no-tx {
+  color: #900;
+}
+
+#kiwi .medialist .meta .video-tools {
+  padding: 10px 0;
+  font-size: 1.6em;
+}
+
+#kiwi .medialist .meta button {
+  margin: 0 2px;
+  color: white;
+  background: #cf8b54;
+}
+

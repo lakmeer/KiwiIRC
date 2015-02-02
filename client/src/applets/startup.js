@@ -26,9 +26,9 @@
             this.listenTo(connection_dialog, 'connected', this.newConnectionConnected);
 
             _.defer(function(){
-                if ($info) {
-                    connection_dialog.view.infoBoxShow();
-                }
+                //if ($info) {
+                    //connection_dialog.view.infoBoxShow();
+                //}
 
                 // Only set focus if we're not within an iframe. (firefox auto scrolls to the embedded client on page load - bad)
                 if (window == window.top) {

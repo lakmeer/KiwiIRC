@@ -358,7 +358,7 @@ msgstr "Key"
 
 #: 
 msgid "client_views_serverselect_connection_start"
-msgstr "Start..."
+msgstr "Connect"
 
 #: 
 msgid "client_views_serverselect_server_and_network"

@@ -1,34 +1,32 @@
 _kiwi.view.RightBar = Backbone.View.extend({
     events: {
         'click .right-bar-toggle': 'onClickToggle',
-        'click .right-bar-toggle-inner': 'onClickToggle'
+        'click .right-bar-toggle-inner': 'onClickToggle',
+        'click .set-right-bar-users': 'showPanelUsers',
+        'click .set-right-bar-media': 'showPanelMedia'
     },
 
     initialize: function() {
         this.keep_hidden = false;
         this.hidden = this.$el.hasClass('disabled');
-
         this.updateIcon();
+        this.$mediaBtn = this.$el.find('.set-right-bar-media');
+        this.$usersBtn = this.$el.find('.set-right-bar-users');
     },
-
 
     hide: function() {
         this.hidden = true;
         this.$el.addClass('disabled');
-
         this.updateIcon();
     },
-
 
     show: function() {
         this.hidden = false;
-
-        if (!this.keep_hidden)
+        if (!this.keep_hidden) {
             this.$el.removeClass('disabled');
-
+        }
         this.updateIcon();
     },
-
 
     // Toggle if the rightbar should be shown or not
     toggle: function(keep_hidden) {
@@ -51,7 +49,6 @@ _kiwi.view.RightBar = Backbone.View.extend({
         this.updateIcon();
     },
 
-
     updateIcon: function() {
         var $toggle = this.$('.right-bar-toggle'),
             $icon = $toggle.find('i');
@@ -69,7 +66,6 @@ _kiwi.view.RightBar = Backbone.View.extend({
         }
     },
 
-
     onClickToggle: function(event) {
         this.toggle();
 
@@ -79,5 +75,17 @@ _kiwi.view.RightBar = Backbone.View.extend({
 
         // No longer ignoring the toggle() call from doLayout()
         delete this.ignore_layout;
+    },
+
+    showPanelUsers : function (event) {
+      this.$el.attr('data-sidepanel', 'users');
+      this.$usersBtn.addClass('active');
+      this.$mediaBtn.removeClass('active');
+    },
+
+    showPanelMedia : function (event) {
+      this.$el.attr('data-sidepanel', 'media');
+      this.$mediaBtn.addClass('active');
+      this.$usersBtn.removeClass('active');
     }
 });

@@ -1,21 +1,24 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<base target="_blank">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <base target="_blank">
 
-<title> Kiwi IRC </title>
+  <title> la vidni zei irci </title>
 
-<link rel="shortcut icon" href="<%base_path%>/assets/img/favicon.ico">
-
-<link rel="stylesheet" type="text/css" href="<%base_path%>/assets/css/style.css?t=<%build_time%>" />
-<link rel="stylesheet" type="text/css" href="<%base_path%>/assets/css/font-awesome.min.css" />
+  <link rel="shortcut icon" href="<%base_path%>/assets/img/favicon.ico">
+  <link rel="stylesheet" type="text/css" href="<%base_path%>/assets/css/style.css?t=<%build_time%>" />
+  <link rel="stylesheet" type="text/css" href="<%base_path%>/assets/css/font-awesome.min.css" />
 </head>
 <body>
 
+  <div class="loading">
+    <h2 class="message"> Loading assets... please wait </h2>
+  </div>
+
     <script type="text/html" id="tmpl_application">
-        <div id="kiwi" class="theme_relaxed">
+        <div id="kiwi" class="theme_lmw">
             <div class="toolbar">
                 <div class="app_tools">
                     <ul class="main">
@@ -40,15 +43,21 @@
                 <div class="panel_container container1"></div>
             </div>
 
-            <div class="right_bar disabled">
+            <div class="right_bar disabled" data-sidepanel="media">
                 <div class="right-bar-toggle"><i class=""></i></div>
                 <div class="right-bar-content">
                     <div class="channel_tools">
+                        <i class="fa fa-users set-right-bar-users"        title="Show userlist"></i>
+                        <i class="fa fa-video-camera set-right-bar-media active" title="Show media chat"></i>
                         <i class="fa fa-info-circle channel_info" title="Channel Info"></i>
-                        <i class="fa fa-sign-out channel_part" title="Leave Channel"></i>
+                        <i class="fa fa-sign-out channel_part"    title="Leave Channel"></i>
                         <i class="fa fa-angle-double-right right-bar-toggle-inner" title="Hide"></i>
                     </div>
-                    <div class="memberlists"></div>
+
+                    <div class="sidepanels">
+                      <div class="sidepanel medialist"> </div>
+                      <div class="sidepanel memberlists"></div>
+                    </div>
                 </div>
             </div>
 

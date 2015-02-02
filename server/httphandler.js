@@ -15,7 +15,8 @@ var cached_available_locales = null;
 
 var HttpHandler = function (config) {
     var public_http = config.public_http || 'client/';
-    this.file_server = new node_static.Server(public_http);
+    var cache_time  = config.static_cache_time;
+    this.file_server = new node_static.Server(public_http, { cache: cache_time });
 
     if (!cached_available_locales) {
         updateLocalesCache();
