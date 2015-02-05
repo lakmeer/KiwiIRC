@@ -262,7 +262,8 @@ IrcConnection.prototype.connect = function () {
                 });
 
                 // We need the raw socket connect event
-                that.socket.socket.on('connect', function() { rawSocketConnect.call(that, this); });
+                // used to be socket.socket - why?? works on my other machine
+                that.socket.on('connect', function() { rawSocketConnect.call(that, this); });
 
                 socket_connect_event_name = 'secureConnect';
 

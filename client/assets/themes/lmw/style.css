@@ -94,7 +94,7 @@
 #kiwi .toolbar .panellist li .activity {
   padding: 1px 3px; margin-left:1em;
   border-radius: 4px;
-  background: #3F9532;
+  background: #9f6f40;
   color:#000;
   /*color: #ff5300;*/
   text-align: center; font-size: 10px;
@@ -607,8 +607,15 @@
  * And overrides for standard theme styles */
 
 
+video {
+  max-width: 100%;
+}
 
-
+video.local {
+  transform: scale(-1,1);
+  border: 1px solid red;
+  -webkit-filter: hue-rotate(33deg);
+}
 
 
 

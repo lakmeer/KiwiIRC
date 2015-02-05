@@ -41,6 +41,9 @@ if (!require('./configloader.js')()) {
 
 var source_files = [
 
+    // External
+    global.config.public_http + '/src/vidni/icecomm.js',
+
     // Models
     global.config.public_http + '/src/app.js',
     global.config.public_http + '/src/models/application.js',
@@ -129,13 +132,13 @@ concat(source_files, function (err, src) {
         // but it's not wraped in an IIFE and produces a slightly larger file
         //src = uglifyJS.minify(source_files);
 
-        var ast = uglifyJS.parse(src, {filename: 'kiwi.js'});
-        ast.figure_out_scope();
-        ast = ast.transform(uglifyJS.Compressor({warnings: false}));
-        ast.figure_out_scope();
-        ast.compute_char_frequency();
-        ast.mangle_names();
-        src = ast.print_to_string();
+        //var ast = uglifyJS.parse(src, {filename: 'kiwi.js'});
+        //ast.figure_out_scope();
+        //ast = ast.transform(uglifyJS.Compressor({warnings: false}));
+        //ast.figure_out_scope();
+        //ast.compute_char_frequency();
+        //ast.mangle_names();
+        //src = ast.print_to_string();
 
         fs.writeFile(global.config.public_http + '/assets/kiwi.min.js', src, { encoding: FILE_ENCODING }, function (err) {
             if (!err) {
