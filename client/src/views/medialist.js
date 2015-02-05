@@ -2,15 +2,23 @@ _kiwi.view.MediaList = Backbone.View.extend({
     tagName: "div",
     events: {
         "click .vidni-join": "joinVideoRoom",
-        "click .vidni-stop": "closeVideoRoom"
+        "click .vidni-stop": "closeVideoRoom",
+        "click .vidni-spectate": "spectateRoom"
     },
 
     closeVideoRoom: function (event) {
       this.ice.close();
+      this.model.userState = 'disconnected';
     },
 
     joinVideoRoom: function (event) {
       this.ice.connect('lojban');
+      this.model.userState = 'transmitting';
+    },
+
+    spectateRoom: function (event) {
+      this.ice.connect('lojban', { stream: false });
+      this.model.userState = 'spectating';
     },
 
     initialize: function (options) {
@@ -70,6 +78,20 @@ _kiwi.view.MediaList = Backbone.View.extend({
             that.$list.append(member.view.$el);
         });
 
+        switch (this.model.userState) {
+          case "disconnected":
+            renderMetaDisconnected();
+            break;
+          case "transmitting":
+            renderMetaTransmitting();
+            break;
+          case "spectating":
+            renderMetaSpectating();
+            break;
+          default:
+            // nothing
+        }
+
         // User count
         if(this.model.channel.isActive()) {
             this.renderMeta();
@@ -84,7 +106,7 @@ _kiwi.view.MediaList = Backbone.View.extend({
         '<div class="status no-rx-no-tx"> Disconnected </div>' +
         '<div class="status currently"> ?? video users, ?? audio users </div>' +
         '<div class="video-tools">' +
-          '<button class="vidni-spectate disabled"><i class="fa fa-eye media_spectate" title="Spectate"></i> Spectate</button>' +
+          '<button class="vidni-spectate"><i class="fa fa-eye media_spectate" title="Spectate"></i> Spectate</button>' +
           '<button class="vidni-join"><i class="fa fa-video-camera media_join" title="Join"></i> Join</button>' +
         '</div>');
     },
