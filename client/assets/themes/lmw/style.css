@@ -617,5 +617,7 @@ video.local {
   -webkit-filter: hue-rotate(33deg);
 }
 
-
+.vidni-spectate.disabled {
+  background: grey !important;
+}
 

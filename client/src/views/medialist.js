@@ -84,7 +84,7 @@ _kiwi.view.MediaList = Backbone.View.extend({
         '<div class="status no-rx-no-tx"> Disconnected </div>' +
         '<div class="status currently"> ?? video users, ?? audio users </div>' +
         '<div class="video-tools">' +
-          '<button class="vidni-spectate"><i class="fa fa-eye media_spectate" title="Spectate"></i> Spectate</button>' +
+          '<button class="vidni-spectate disabled"><i class="fa fa-eye media_spectate" title="Spectate"></i> Spectate</button>' +
           '<button class="vidni-join"><i class="fa fa-video-camera media_join" title="Join"></i> Join</button>' +
         '</div>');
     },
