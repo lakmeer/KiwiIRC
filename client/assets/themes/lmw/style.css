@@ -617,8 +617,6 @@ video {
 
 video.local {
   transform: scale(-1,1);
-  border: 1px solid red;
-  -webkit-filter: hue-rotate(33deg);
 }
 
 video:before {
