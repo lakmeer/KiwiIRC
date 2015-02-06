@@ -9,11 +9,13 @@ _kiwi.view.MediaList = Backbone.View.extend({
     closeVideoRoom: function (event) {
       this.ice.close();
       this.model.userState = 'disconnected';
+      this.renderMetaDisconnected(this.model);
     },
 
     joinVideoRoom: function (event) {
       this.ice.connect('lojban');
       this.model.userState = 'transmitting';
+      this.renderMetaTransmitting(this.model);
     },
 
     spectateRoom: function (event) {
