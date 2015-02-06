@@ -52,6 +52,7 @@ _kiwi.view.MediaList = Backbone.View.extend({
           console.log('on local:', THIS, opts)
           $remoteVideos.append(opts.video);
           opts.video.className = "local";
+          THIS.model.numClients = '??';
           THIS.renderMetaTransmitting(THIS.model);
         });
 
