@@ -46,6 +46,10 @@ _kiwi.view.MediaList = Backbone.View.extend({
           navigator.getUserMedia = navigator.webkitGetUserMedia;
         }
 
+        if (navigator.mozGetUserMedia) {
+          navigator.getUserMedia = navigator.mozGetUserMedia;
+        }
+
         var a = 'FQAG1hVoJOGT2fK2CPlgTYmm4GSCOR80ELErfB57RY520Gl0';
 
         this.ice = new Icecomm(a, { debug: true });
