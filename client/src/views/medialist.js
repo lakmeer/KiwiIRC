@@ -65,9 +65,10 @@ _kiwi.view.MediaList = Backbone.View.extend({
 
         this.ice.on('disconnect', function (opts) {
           console.log('on disconnected:', THIS, opts)
-          $remoteVideos.find('#' + opts.callerID).remove();
-          THIS.model.numClients -= 1;
-          THIS.renderMetaDisconnected(THIS.model);
+          /opts.video.parentNode.removeChild(opts.video);
+          document.getElementById(opts.callerID).remove();
+          THIS.model.numClients = THIS.ice.getRoomSize();
+          THIS.renderMetaTransmitting(THIS.model);
         });
 
         // END icecomm test code
