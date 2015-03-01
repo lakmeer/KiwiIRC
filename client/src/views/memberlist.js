@@ -1,5 +1,6 @@
 _kiwi.view.MemberList = Backbone.View.extend({
     tagName: "div",
+
     events: {
         "click .nick": "nickClick",
         "click .channel_info": "channelInfoClick"
@@ -15,6 +16,7 @@ _kiwi.view.MemberList = Backbone.View.extend({
         // The list for holding the nicks
         this.$list = $('<ul></ul>').appendTo(this.$el);
     },
+
     render: function () {
         var that = this;
 

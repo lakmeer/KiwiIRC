@@ -55,7 +55,7 @@
                     </div>
 
                     <div class="sidepanels">
-                      <div class="sidepanel medialist"> </div>
+                      <div class="sidepanel videochats"> </div>
                       <div class="sidepanel memberlists"></div>
                     </div>
                 </div>
@@ -124,6 +124,68 @@
     </script>
 
 
+    <script type="text/html" id="tmpl_videopanel">
+      <div class="remote"> </div>
+      <div class="meta"> </div>
+      <div class="self"> </div>
+    </script>
+
+
+    <script type="text/html" id="tmpl_videochatmeta">
+      <p class="title">Video Chat</p>
+
+      <% var statusClass = userState === 'disconnected' ? 'no-rx-no-tx' :
+                           userState === 'spectating'   ? 'rx-no-tx' :
+                           userState === 'joined'       ? 'rx-tx' : 'wat'; %>
+
+      <div class="status <%= statusClass %>"> <%= userState %> </div>
+      <div class="status peerCount"><%= numPeers %> peers </div>
+
+      <div class="video-tools">
+        <% if (userState !== 'joined') { %>
+          <button class="vidni-join">
+            <i class="fa fa-video-camera" title="Join"></i>
+            Join
+          </button>
+        <% } %>
+
+        <% if (userState !== 'spectating') { %>
+          <button class="vidni-spectate">
+            <i class="fa fa-eye" title="Spectate"></i>
+            Spectate
+          </button>
+        <% } %>
+
+        <% if (userState !== 'disconnected') { %>
+          <button class="vidni-leave">
+            <i class="fa fa-close" title="Leave"></i>
+            Leave
+          </button>
+        <% } %>
+      </div>
+    </script>
+
+
+    <script type="text/html" id="tmpl_videochat">
+      <div class="video-chat">
+        <label class="username"> <%= username %> </label>
+
+        <video>
+          <source format="mp4" src="/assets/wat.mov">
+        </video>
+
+        <div class="volume-control-container">
+          <div class="volume-control-value"></div>
+        </div>
+
+        <div class="controls">
+          <button class="video-control-button audio-mute"><i class="fa fa-volume-up"></i></button>
+          <button class="video-control-button video-mute"><i class="fa fa-video-camera"></i></button>
+        </div>
+      </div>
+    </script>
+
+
     <script type="text/html" id="tmpl_userbox">
         <div class="userbox">
             <a class="close_menu if_op op"><i class="fa fa-star"></i><%= op %></a>
@@ -134,8 +196,7 @@
             <a class="close_menu if_op ban"><i class="fa fa-ban"></i><%= ban %></a>
 
             <a class="close_menu query"><i class="fa fa-comment"></i><%= message %></a>
-            <a class="close_menu info"><i class="fa fa-info-circle"></i><%= info %></a>
-            <a class="close_menu ignore"><label><i><input type="checkbox" /></i><%= ignore %></label></a>
+            <a class="close_menu info"><i class="fa fa-info-circle"></i><%= info %></a> <a class="close_menu ignore"><label><i><input type="checkbox" /></i><%= ignore %></label></a>
         </div>
     </script>
 

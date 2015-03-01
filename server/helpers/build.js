@@ -64,8 +64,8 @@ var source_files = [
     global.config.public_http + '/src/models/channelinfo.js',
 
     // LMW custom models
-    global.config.public_http + '/src/models/mediastream.js',
-    global.config.public_http + '/src/models/medialist.js',
+    global.config.public_http + '/src/models/video.js',
+    global.config.public_http + '/src/models/video-panel.js',
 
     // Views
     global.config.public_http + '/src/views/panel.js',
@@ -93,7 +93,8 @@ var source_files = [
     global.config.public_http + '/src/views/notification.js',
 
     // LMW custom views
-    global.config.public_http + '/src/views/medialist.js',
+    global.config.public_http + '/src/views/video.js',
+    global.config.public_http + '/src/views/video-panel.js',
 
     global.config.public_http + '/src/misc/clientuicommands.js',
 
