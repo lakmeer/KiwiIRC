@@ -7,7 +7,7 @@ _kiwi.model.Channel = _kiwi.model.Panel.extend({
 
         this.set({
             "members": new _kiwi.model.MemberList(),
-            "media": new _kiwi.model.MediaList(),
+            "videochat": new _kiwi.model.VideoChat({ channelName: name }),
             "name": name,
             "scrollback": [],
             "topic": ""

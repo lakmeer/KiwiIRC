@@ -1,220 +1,279 @@
-// 'use strict';
+(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+"use strict";
 
-var RTCPeerConnection = null;
-var getUserMedia = null;
-var attachMediaStream = null;
-var reattachMediaStream = null;
-var webrtcDetectedBrowser = null;
-var webrtcDetectedVersion = null;
+var _interopRequire = function (obj) { return obj && obj.__esModule ? obj["default"] : obj; };
 
-function maybeFixConfiguration(pcConfig) {
-  if (!pcConfig) {
-    return;
-  }
-  for (var i = 0; i < pcConfig.iceServers.length; i++) {
-    if (pcConfig.iceServers[i].hasOwnProperty('urls')) {
-      pcConfig.iceServers[i].url = pcConfig.iceServers[i].urls;
-      delete pcConfig.iceServers[i].urls;
-    }
-  }
-}
+var _createClass = (function () { function defineProperties(target, props) { for (var key in props) { var prop = props[key]; prop.configurable = true; if (prop.value) prop.writable = true; } Object.defineProperties(target, props); } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
 
-if (navigator.mozGetUserMedia) {
-  // console.log('This appears to be Firefox');
+var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } };
 
-  window.webrtcDetectedBrowser = 'firefox';
+var io = _interopRequire(require("socket.io-client"));
 
-  window.webrtcDetectedVersion =
-    parseInt(navigator.userAgent.match(/Firefox\/([0-9]+)\./)[1], 10);
+var _commonHelpers = require("../../common/helpers");
 
-  // The RTCPeerConnection object.
-  RTCPeerConnection = function(pcConfig, pcConstraints) {
-    // .urls is not supported in FF yet.
-    maybeFixConfiguration(pcConfig);
-    return new mozRTCPeerConnection(pcConfig, pcConstraints);
-  };
+var id = _commonHelpers.id;
+var log = _commonHelpers.log;
+var reportError = _commonHelpers.reportError;
 
-  // The RTCSessionDescription object.
-  RTCSessionDescription = mozRTCSessionDescription;
+var Collection = _interopRequire(require("../../common/collection"));
 
-  // The RTCIceCandidate object.
-  RTCIceCandidate = mozRTCIceCandidate;
+var Peer = _interopRequire(require("./peer"));
 
-  // Get UserMedia (only difference is the prefix).
-  // Code from Adam Barth.
-  window.getUserMedia = navigator.mozGetUserMedia.bind(navigator);
-  navigator.getUserMedia = getUserMedia;
+//
+// P2PRoom Class
+//
+// TODO:
+//
+// - Don't join room or dispatch callback if room already joined
+// - Similarly for leaving
+// - Check for duplicate peers
 
-  // Creates iceServer from the url for FF.
-  window.createIceServer = function(url, username, password) {
-    var iceServer = null;
-    var urlParts = url.split(':');
-    if (urlParts[0].indexOf('stun') === 0) {
-      // Create iceServer with stun url.
-      iceServer = {
-        'url': url
-      };
-    } else if (urlParts[0].indexOf('turn') === 0) {
-      if (webrtcDetectedVersion < 27) {
-        // Create iceServer with turn url.
-        // Ignore the transport parameter from TURN url for FF version <=27.
-        var turnUrlParts = url.split('?');
-        // Return null for createIceServer if transport=tcp.
-        if (turnUrlParts.length === 1 ||
-          turnUrlParts[1].indexOf('transport=udp') === 0) {
-          iceServer = {
-            'url': turnUrlParts[0],
-            'credential': password,
-            'username': username
-          };
-        }
-      } else {
-        // FF 27 and above supports transport parameters in TURN url,
-        // So passing in the full url to create iceServer.
-        iceServer = {
-          'url': url,
-          'credential': password,
-          'username': username
+window.P2PRoom = (function () {
+    function P2PRoom(name, serverURL) {
+        _classCallCheck(this, P2PRoom);
+
+        this.options = {
+            name: name,
+            serverURL: serverURL
         };
-      }
+        this.state = {
+            needsSettingUp: true,
+            peers: new Collection()
+        };
+        this.callbacks = {
+            peerConnected: id,
+            peerDisonnected: id,
+            joinError: id
+        };
+        this.socket = io.connect(serverURL);
     }
-    return iceServer;
-  };
 
-  window.createIceServers = function(urls, username, password) {
-    var iceServers = [];
-    // Use .url for FireFox.
-    for (var i = 0; i < urls.length; i++) {
-      var iceServer = createIceServer(urls[i],
-        username,
-        password);
-      if (iceServer !== null) {
-        iceServers.push(iceServer);
-      }
-    }
-    return iceServers;
-  };
+    _createClass(P2PRoom, {
+        on: {
 
-  // Attach a media stream to an element.
-  window.attachMediaStream = function(element, stream) {
-    console.log('Attaching media stream');
-    element.mozSrcObject = stream;
-    element.play();
-  };
+            //
+            // External methods
+            //
 
-  window.reattachMediaStream = function(to, from) {
-    // console.log('Reattaching media stream');
-    to.mozSrcObject = from.mozSrcObject;
-    to.play();
-  };
+            // On: bind callbacks to important room events
 
-} else if (navigator.webkitGetUserMedia) {
-  // console.log('This appears to be Chrome');
+            value: function on(event, λ) {
+                this.callbacks[event] = λ;
+            }
+        },
+        join: {
 
-  window.webrtcDetectedBrowser = 'chrome';
-  // Temporary fix until crbug/374263 is fixed.
-  // Setting Chrome version to 999, if version is unavailable.
-  var result = navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./);
-  if (result !== null) {
-    window.webrtcDetectedVersion = parseInt(result[2], 10);
-  } else {
-    window.webrtcDetectedVersion = 999;
-  }
+            // Join: join the room by asking signaling server for peers to talk to
 
-  // Creates iceServer from the url for Chrome M33 and earlier.
-  window.createIceServer = function(url, username, password) {
-    var iceServer = null;
-    var urlParts = url.split(':');
-    if (urlParts[0].indexOf('stun') === 0) {
-      // Create iceServer with stun url.
-      iceServer = {
-        'url': url
-      };
-    } else if (urlParts[0].indexOf('turn') === 0) {
-      // Chrome M28 & above uses below TURN format.
-      iceServer = {
-        'url': url,
-        'credential': password,
-        'username': username
-      };
-    }
-    return iceServer;
-  };
+            value: function join(username, meta) {
+                log("Room::joining as", username);
 
-  // Creates iceServers from the urls for Chrome M34 and above.
-  window.createIceServers = function(urls, username, password) {
-    var iceServers = [];
-    if (webrtcDetectedVersion >= 34) {
-      // .urls is supported since Chrome M34.
-      iceServers = {
-        'urls': urls,
-        'credential': password,
-        'username': username
-      };
-    } else {
-      for (var i = 0; i < urls.length; i++) {
-        var iceServer = createIceServer(urls[i],
-          username,
-          password);
-        if (iceServer !== null) {
-          iceServers.push(iceServer);
+                this.socket.emit("join", username, meta || {});
+
+                if (this.state.needsSettingUp) {
+                    this.socket.on("offer", this.onReceivedOffer.bind(this));
+                    this.socket.on("answer", this.onReceivedAnswer.bind(this));
+                    this.socket.on("candidate", this.onReceivedRemoteCandidate.bind(this));
+                    this.socket.on("peer-list", this.onPeerList.bind(this));
+                    this.socket.on("peer-disconnected", this.onPeerDisconnected.bind(this));
+
+                    this.socket.on("join-error", this.callbacks.joinError.bind(this));
+
+                    this.state.needsSettingUp = false;
+                }
+            }
+        },
+        leave: {
+
+            // Leave: stop talking to peers (but don't disconnect from signal server)
+
+            value: function leave() {
+                this.socket.emit("leave");
+                this.state.peers.forEach(function (peer) {
+                    return peer.pc.close();
+                });
+                this.state.peers.clear();
+            }
+        },
+        onReceivedOffer: {
+
+            //
+            // Socket event handlers
+            //
+
+            value: function onReceivedOffer(peerInfo, offerSdp) {
+                var _this = this;
+
+                log("Room::answerOffer - answering offer from", peerInfo.username);
+                // If we're getting an offer (not an answer), the connection is only
+                // halfway set up, so there is no Peer object on our end yet. Make one.
+                var peer = this.createNewPeer(peerInfo);
+                peer.dispatchAnswer(offerSdp, function (sessionDescription) {
+                    return _this.socket.emit("answer", peerInfo, sessionDescription);
+                });
+            }
+        },
+        onReceivedAnswer: {
+            value: function onReceivedAnswer(peerInfo, answerSdp) {
+                this.getPeer(peerInfo).setRemoteDescription(answerSdp);
+            }
+        },
+        onReceivedRemoteCandidate: {
+            value: function onReceivedRemoteCandidate(peerInfo, candidate) {
+                this.getPeer(peerInfo).saveIceCandidate(candidate);
+            }
+        },
+        onPeerDisconnected: {
+
+            // onPeerDisconnected - signal server told us a peer stopped talking
+
+            value: function onPeerDisconnected(peerInfo) {
+                this.callbacks.peerDisconnected(peerInfo);
+                // Turns out we don't have to do much, because the leave() function
+                // called on the other end will terminate the PC which propagates to us
+                this.state.peers.remove(this.getPeer(peerInfo));
+            }
+        },
+        onPeerList: {
+
+            // onPeerList - signal server told us all the peers we can send offers to
+
+            value: function onPeerList(peerList) {
+                var _this = this;
+
+                if (peerList.length === 0) {
+                    log("Room::join - no-one is here :(  Wait for new peers.");
+                } else {
+                    log("Room::join -", peerList.length, "peers found!", peerList);
+                }
+
+                peerList.forEach(function (peerInfo) {
+                    var peer = _this.createNewPeer(peerInfo);
+                    peer.dispatchOffer(function (sessionDescription) {
+                        return _this.socket.emit("offer", peerInfo, sessionDescription);
+                    });
+                });
+            }
+        },
+        createNewPeer: {
+
+            //
+            // Helper methods
+            //
+
+            value: function createNewPeer(peerInfo) {
+                var _this = this;
+
+                var peer = new Peer(peerInfo, function (candidate) {
+                    return _this.socket.emit("candidate", candidate);
+                });
+                this.state.peers.push(peer);
+                this.callbacks.peerConnected(peer);
+                return peer;
+            }
+        },
+        getPeer: {
+            value: function getPeer(peerInfo) {
+                return this.state.peers.anyWith("id", peerInfo.id) || Peer.Zero();
+            }
         }
-      }
-    }
-    return iceServers;
-  };
+    });
 
-  // The MediaStream object.
-  MediaStream = webkitMediaStream;
+    return P2PRoom;
+})();
 
-  // The RTCPeerConnection object.
-  RTCPeerConnection = function(pcConfig, pcConstraints) {
-    // .urls is supported since Chrome M34.
-    if (webrtcDetectedVersion < 34) {
-      maybeFixConfiguration(pcConfig);
-    }
-    return new webkitRTCPeerConnection(pcConfig, pcConstraints);
-  };
+module.exports = P2PRoom;
 
-  // Get UserMedia (only difference is the prefix).
-  // Code from Adam Barth.
-  window.getUserMedia = navigator.webkitGetUserMedia.bind(navigator);
-  navigator.getUserMedia = getUserMedia;
+},{"../../common/collection":2,"../../common/helpers":3,"./peer":54,"socket.io-client":4}],2:[function(require,module,exports){
+"use strict";
 
-  // Attach a media stream to an element.
-  window.attachMediaStream = function(element, stream) {
-    if (typeof element.srcObject !== 'undefined') {
-      element.srcObject = stream;
-    } else if (typeof element.mozSrcObject !== 'undefined') {
-      element.mozSrcObject = stream;
-    } else if (typeof element.src !== 'undefined') {
-      element.src = URL.createObjectURL(stream);
-    } else {
-      console.log('Error attaching stream to element.');
-    }
-  };
+// Simple robust Collection class
+//
+// Is like an array but has all kinds of useful extra features
 
-  window.reattachMediaStream = function(to, from) {
-    to.src = from.src;
-  };
-} else {
-  console.log('Browser does not appear to be WebRTC-capable');
-}
+var Collection = function Collection() {
+    this.members = [];
+    //this.length = 0;
 
-!function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.io=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(_dereq_,module,exports){
+    Object.defineProperty(this, "length", {
+        get: function get() {
+            return this.members.length;
+        }
+    });
+};
 
-module.exports = _dereq_('./lib/');
+Collection.prototype.push = function (item) {
+    this.members.push(item);
+    //this.length = this.members.length;
+    return this.members;
+};
 
-},{"./lib/":2}],2:[function(_dereq_,module,exports){
+Collection.prototype.forEach = function (λ) {
+    return this.members.forEach(λ);
+};
+
+Collection.prototype.select = function (λ) {
+    var result = this.members.filter(λ);
+    return result.length > 0 ? result[0] : undefined;
+};
+
+Collection.prototype.anyWith = function (prop, value) {
+    return this.select(function (item) {
+        return item[prop] && item[prop] === value;
+    });
+};
+
+Collection.prototype.remove = function (peerInfo) {
+    this.members.splice(this.members.indexOf(peerInfo), 1);
+};
+
+Collection.prototype.clear = function () {
+    this.members = [];
+    //this.length = 0;
+};
+
+// Export
+
+module.exports = Collection;
+
+},{}],3:[function(require,module,exports){
+"use strict";
+
+/**
+ * Created by ghoststreet on 2/24/15.
+ */
+// Helpers
+
+exports.log = function () {
+    console.log.apply(console, arguments);
+};
+
+exports.reportError = function (error) {
+    console.error("Error:", error);
+};
+
+exports.id = function () {
+    return arguments[0];
+};
+
+exports.getDom = function (id) {
+    return document.getElementById(id);
+};
+
+},{}],4:[function(require,module,exports){
+
+module.exports = require('./lib/');
+
+},{"./lib/":5}],5:[function(require,module,exports){
 
 /**
  * Module dependencies.
  */
 
-var url = _dereq_('./url');
-var parser = _dereq_('socket.io-parser');
-var Manager = _dereq_('./manager');
-var debug = _dereq_('debug')('socket.io-client');
+var url = require('./url');
+var parser = require('socket.io-parser');
+var Manager = require('./manager');
+var debug = require('debug')('socket.io-client');
 
 /**
  * Module exports.
@@ -291,25 +350,26 @@ exports.connect = lookup;
  * @api public
  */
 
-exports.Manager = _dereq_('./manager');
-exports.Socket = _dereq_('./socket');
+exports.Manager = require('./manager');
+exports.Socket = require('./socket');
 
-},{"./manager":3,"./socket":5,"./url":6,"debug":9,"socket.io-parser":43}],3:[function(_dereq_,module,exports){
+},{"./manager":6,"./socket":8,"./url":9,"debug":13,"socket.io-parser":49}],6:[function(require,module,exports){
 
 /**
  * Module dependencies.
  */
 
-var url = _dereq_('./url');
-var eio = _dereq_('engine.io-client');
-var Socket = _dereq_('./socket');
-var Emitter = _dereq_('component-emitter');
-var parser = _dereq_('socket.io-parser');
-var on = _dereq_('./on');
-var bind = _dereq_('component-bind');
-var object = _dereq_('object-component');
-var debug = _dereq_('debug')('socket.io-client:manager');
-var indexOf = _dereq_('indexof');
+var url = require('./url');
+var eio = require('engine.io-client');
+var Socket = require('./socket');
+var Emitter = require('component-emitter');
+var parser = require('socket.io-parser');
+var on = require('./on');
+var bind = require('component-bind');
+var object = require('object-component');
+var debug = require('debug')('socket.io-client:manager');
+var indexOf = require('indexof');
+var Backoff = require('backo2');
 
 /**
  * Module exports
@@ -341,11 +401,16 @@ function Manager(uri, opts){
   this.reconnectionAttempts(opts.reconnectionAttempts || Infinity);
   this.reconnectionDelay(opts.reconnectionDelay || 1000);
   this.reconnectionDelayMax(opts.reconnectionDelayMax || 5000);
+  this.randomizationFactor(opts.randomizationFactor || 0.5);
+  this.backoff = new Backoff({
+    min: this.reconnectionDelay(),
+    max: this.reconnectionDelayMax(),
+    jitter: this.randomizationFactor()
+  });
   this.timeout(null == opts.timeout ? 20000 : opts.timeout);
   this.readyState = 'closed';
   this.uri = uri;
   this.connected = [];
-  this.attempts = 0;
   this.encoding = false;
   this.packetBuffer = [];
   this.encoder = new parser.Encoder();
@@ -364,6 +429,18 @@ Manager.prototype.emitAll = function() {
   this.emit.apply(this, arguments);
   for (var nsp in this.nsps) {
     this.nsps[nsp].emit.apply(this.nsps[nsp], arguments);
+  }
+};
+
+/**
+ * Update `socket.id` of all sockets
+ *
+ * @api private
+ */
+
+Manager.prototype.updateSocketIds = function(){
+  for (var nsp in this.nsps) {
+    this.nsps[nsp].id = this.engine.id;
   }
 };
 
@@ -412,6 +489,14 @@ Manager.prototype.reconnectionAttempts = function(v){
 Manager.prototype.reconnectionDelay = function(v){
   if (!arguments.length) return this._reconnectionDelay;
   this._reconnectionDelay = v;
+  this.backoff && this.backoff.setMin(v);
+  return this;
+};
+
+Manager.prototype.randomizationFactor = function(v){
+  if (!arguments.length) return this._randomizationFactor;
+  this._randomizationFactor = v;
+  this.backoff && this.backoff.setJitter(v);
   return this;
 };
 
@@ -426,6 +511,7 @@ Manager.prototype.reconnectionDelay = function(v){
 Manager.prototype.reconnectionDelayMax = function(v){
   if (!arguments.length) return this._reconnectionDelayMax;
   this._reconnectionDelayMax = v;
+  this.backoff && this.backoff.setMax(v);
   return this;
 };
 
@@ -451,9 +537,8 @@ Manager.prototype.timeout = function(v){
 
 Manager.prototype.maybeReconnectOnOpen = function() {
   // Only try to reconnect if it's the first time we're connecting
-  if (!this.openReconnect && !this.reconnecting && this._reconnection && this.attempts === 0) {
+  if (!this.reconnecting && this._reconnection && this.backoff.attempts === 0) {
     // keeps reconnection from firing twice for the same reconnection loop
-    this.openReconnect = true;
     this.reconnect();
   }
 };
@@ -495,9 +580,10 @@ Manager.prototype.connect = function(fn){
       var err = new Error('Connection error');
       err.data = data;
       fn(err);
+    } else {
+      // Only do this if there is no fn to handle the error
+      self.maybeReconnectOnOpen();
     }
-
-    self.maybeReconnectOnOpen();
   });
 
   // emit `connect_timeout`
@@ -596,6 +682,7 @@ Manager.prototype.socket = function(nsp){
     this.nsps[nsp] = socket;
     var self = this;
     socket.on('connect', function(){
+      socket.id = self.engine.id;
       if (!~indexOf(self.connected, socket)) {
         self.connected.push(socket);
       }
@@ -683,6 +770,7 @@ Manager.prototype.cleanup = function(){
 Manager.prototype.close =
 Manager.prototype.disconnect = function(){
   this.skipReconnect = true;
+  this.backoff.reset();
   this.readyState = 'closed';
   this.engine && this.engine.close();
 };
@@ -696,6 +784,7 @@ Manager.prototype.disconnect = function(){
 Manager.prototype.onclose = function(reason){
   debug('close');
   this.cleanup();
+  this.backoff.reset();
   this.readyState = 'closed';
   this.emit('close', reason);
   if (this._reconnection && !this.skipReconnect) {
@@ -713,15 +802,14 @@ Manager.prototype.reconnect = function(){
   if (this.reconnecting || this.skipReconnect) return this;
 
   var self = this;
-  this.attempts++;
 
-  if (this.attempts > this._reconnectionAttempts) {
+  if (this.backoff.attempts >= this._reconnectionAttempts) {
     debug('reconnect failed');
+    this.backoff.reset();
     this.emitAll('reconnect_failed');
     this.reconnecting = false;
   } else {
-    var delay = this.attempts * this.reconnectionDelay();
-    delay = Math.min(delay, this.reconnectionDelayMax());
+    var delay = this.backoff.duration();
     debug('will wait %dms before reconnect attempt', delay);
 
     this.reconnecting = true;
@@ -729,8 +817,8 @@ Manager.prototype.reconnect = function(){
       if (self.skipReconnect) return;
 
       debug('attempting reconnect');
-      self.emitAll('reconnect_attempt', self.attempts);
-      self.emitAll('reconnecting', self.attempts);
+      self.emitAll('reconnect_attempt', self.backoff.attempts);
+      self.emitAll('reconnecting', self.backoff.attempts);
 
       // check again for the case socket closed in above events
       if (self.skipReconnect) return;
@@ -763,13 +851,14 @@ Manager.prototype.reconnect = function(){
  */
 
 Manager.prototype.onreconnect = function(){
-  var attempt = this.attempts;
-  this.attempts = 0;
+  var attempt = this.backoff.attempts;
   this.reconnecting = false;
+  this.backoff.reset();
+  this.updateSocketIds();
   this.emitAll('reconnect', attempt);
 };
 
-},{"./on":4,"./socket":5,"./url":6,"component-bind":7,"component-emitter":8,"debug":9,"engine.io-client":10,"indexof":39,"object-component":40,"socket.io-parser":43}],4:[function(_dereq_,module,exports){
+},{"./on":7,"./socket":8,"./url":9,"backo2":10,"component-bind":11,"component-emitter":12,"debug":13,"engine.io-client":14,"indexof":45,"object-component":46,"socket.io-parser":49}],7:[function(require,module,exports){
 
 /**
  * Module exports.
@@ -795,19 +884,19 @@ function on(obj, ev, fn) {
   };
 }
 
-},{}],5:[function(_dereq_,module,exports){
+},{}],8:[function(require,module,exports){
 
 /**
  * Module dependencies.
  */
 
-var parser = _dereq_('socket.io-parser');
-var Emitter = _dereq_('component-emitter');
-var toArray = _dereq_('to-array');
-var on = _dereq_('./on');
-var bind = _dereq_('component-bind');
-var debug = _dereq_('debug')('socket.io-client:socket');
-var hasBin = _dereq_('has-binary');
+var parser = require('socket.io-parser');
+var Emitter = require('component-emitter');
+var toArray = require('to-array');
+var on = require('./on');
+var bind = require('component-bind');
+var debug = require('debug')('socket.io-client:socket');
+var hasBin = require('has-binary');
 
 /**
  * Module exports.
@@ -987,6 +1076,7 @@ Socket.prototype.onclose = function(reason){
   debug('close (%s)', reason);
   this.connected = false;
   this.disconnected = true;
+  delete this.id;
   this.emit('disconnect', reason);
 };
 
@@ -1181,15 +1271,15 @@ Socket.prototype.disconnect = function(){
   return this;
 };
 
-},{"./on":4,"component-bind":7,"component-emitter":8,"debug":9,"has-binary":35,"socket.io-parser":43,"to-array":47}],6:[function(_dereq_,module,exports){
+},{"./on":7,"component-bind":11,"component-emitter":12,"debug":13,"has-binary":43,"socket.io-parser":49,"to-array":53}],9:[function(require,module,exports){
 (function (global){
 
 /**
  * Module dependencies.
  */
 
-var parseuri = _dereq_('parseuri');
-var debug = _dereq_('debug')('socket.io-client:url');
+var parseuri = require('parseuri');
+var debug = require('debug')('socket.io-client:url');
 
 /**
  * Module exports.
@@ -1211,7 +1301,7 @@ function url(uri, loc){
 
   // default to window.location
   var loc = loc || global.location;
-  if (null == uri) uri = loc.protocol + '//' + loc.hostname;
+  if (null == uri) uri = loc.protocol + '//' + loc.host;
 
   // relative path support
   if ('string' == typeof uri) {
@@ -1257,8 +1347,95 @@ function url(uri, loc){
   return obj;
 }
 
-}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"debug":9,"parseuri":41}],7:[function(_dereq_,module,exports){
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"debug":13,"parseuri":47}],10:[function(require,module,exports){
+
+/**
+ * Expose `Backoff`.
+ */
+
+module.exports = Backoff;
+
+/**
+ * Initialize backoff timer with `opts`.
+ *
+ * - `min` initial timeout in milliseconds [100]
+ * - `max` max timeout [10000]
+ * - `jitter` [0]
+ * - `factor` [2]
+ *
+ * @param {Object} opts
+ * @api public
+ */
+
+function Backoff(opts) {
+  opts = opts || {};
+  this.ms = opts.min || 100;
+  this.max = opts.max || 10000;
+  this.factor = opts.factor || 2;
+  this.jitter = opts.jitter > 0 && opts.jitter <= 1 ? opts.jitter : 0;
+  this.attempts = 0;
+}
+
+/**
+ * Return the backoff duration.
+ *
+ * @return {Number}
+ * @api public
+ */
+
+Backoff.prototype.duration = function(){
+  var ms = this.ms * Math.pow(this.factor, this.attempts++);
+  if (this.jitter) {
+    var rand =  Math.random();
+    var deviation = Math.floor(rand * this.jitter * ms);
+    ms = (Math.floor(rand * 10) & 1) == 0  ? ms - deviation : ms + deviation;
+  }
+  return Math.min(ms, this.max) | 0;
+};
+
+/**
+ * Reset the number of attempts.
+ *
+ * @api public
+ */
+
+Backoff.prototype.reset = function(){
+  this.attempts = 0;
+};
+
+/**
+ * Set the minimum duration
+ *
+ * @api public
+ */
+
+Backoff.prototype.setMin = function(min){
+  this.ms = min;
+};
+
+/**
+ * Set the maximum duration
+ *
+ * @api public
+ */
+
+Backoff.prototype.setMax = function(max){
+  this.max = max;
+};
+
+/**
+ * Set the jitter
+ *
+ * @api public
+ */
+
+Backoff.prototype.setJitter = function(jitter){
+  this.jitter = jitter;
+};
+
+
+},{}],11:[function(require,module,exports){
 /**
  * Slice reference.
  */
@@ -1283,7 +1460,7 @@ module.exports = function(obj, fn){
   }
 };
 
-},{}],8:[function(_dereq_,module,exports){
+},{}],12:[function(require,module,exports){
 
 /**
  * Expose `Emitter`.
@@ -1449,7 +1626,7 @@ Emitter.prototype.hasListeners = function(event){
   return !! this.listeners(event).length;
 };
 
-},{}],9:[function(_dereq_,module,exports){
+},{}],13:[function(require,module,exports){
 
 /**
  * Expose `debug()` as the module.
@@ -1588,13 +1765,13 @@ try {
   if (window.localStorage) debug.enable(localStorage.debug);
 } catch(e){}
 
-},{}],10:[function(_dereq_,module,exports){
+},{}],14:[function(require,module,exports){
 
-module.exports =  _dereq_('./lib/');
+module.exports =  require('./lib/');
 
-},{"./lib/":11}],11:[function(_dereq_,module,exports){
+},{"./lib/":15}],15:[function(require,module,exports){
 
-module.exports = _dereq_('./socket');
+module.exports = require('./socket');
 
 /**
  * Exports parser
@@ -1602,22 +1779,22 @@ module.exports = _dereq_('./socket');
  * @api public
  *
  */
-module.exports.parser = _dereq_('engine.io-parser');
+module.exports.parser = require('engine.io-parser');
 
-},{"./socket":12,"engine.io-parser":24}],12:[function(_dereq_,module,exports){
+},{"./socket":16,"engine.io-parser":28}],16:[function(require,module,exports){
 (function (global){
 /**
  * Module dependencies.
  */
 
-var transports = _dereq_('./transports');
-var Emitter = _dereq_('component-emitter');
-var debug = _dereq_('debug')('engine.io-client:socket');
-var index = _dereq_('indexof');
-var parser = _dereq_('engine.io-parser');
-var parseuri = _dereq_('parseuri');
-var parsejson = _dereq_('parsejson');
-var parseqs = _dereq_('parseqs');
+var transports = require('./transports');
+var Emitter = require('component-emitter');
+var debug = require('debug')('engine.io-client:socket');
+var index = require('indexof');
+var parser = require('engine.io-parser');
+var parseuri = require('parseuri');
+var parsejson = require('parsejson');
+var parseqs = require('parseqs');
 
 /**
  * Module exports.
@@ -1665,7 +1842,12 @@ function Socket(uri, opts){
   if (opts.host) {
     var pieces = opts.host.split(':');
     opts.hostname = pieces.shift();
-    if (pieces.length) opts.port = pieces.pop();
+    if (pieces.length) {
+      opts.port = pieces.pop();
+    } else if (!opts.port) {
+      // if no port is specified manually, use the protocol default
+      opts.port = this.secure ? '443' : '80';
+    }
   }
 
   this.agent = opts.agent || false;
@@ -1690,9 +1872,19 @@ function Socket(uri, opts){
   this.callbackBuffer = [];
   this.policyPort = opts.policyPort || 843;
   this.rememberUpgrade = opts.rememberUpgrade || false;
-  this.open();
   this.binaryType = null;
   this.onlyBinaryUpgrades = opts.onlyBinaryUpgrades;
+
+  // SSL options for Node.js client
+  this.pfx = opts.pfx || null;
+  this.key = opts.key || null;
+  this.passphrase = opts.passphrase || null;
+  this.cert = opts.cert || null;
+  this.ca = opts.ca || null;
+  this.ciphers = opts.ciphers || null;
+  this.rejectUnauthorized = opts.rejectUnauthorized || null;
+
+  this.open();
 }
 
 Socket.priorWebsocketSuccess = false;
@@ -1717,9 +1909,9 @@ Socket.protocol = parser.protocol; // this is an int
  */
 
 Socket.Socket = Socket;
-Socket.Transport = _dereq_('./transport');
-Socket.transports = _dereq_('./transports');
-Socket.parser = _dereq_('engine.io-parser');
+Socket.Transport = require('./transport');
+Socket.transports = require('./transports');
+Socket.parser = require('engine.io-parser');
 
 /**
  * Creates transport of the given type.
@@ -1756,7 +1948,14 @@ Socket.prototype.createTransport = function (name) {
     timestampRequests: this.timestampRequests,
     timestampParam: this.timestampParam,
     policyPort: this.policyPort,
-    socket: this
+    socket: this,
+    pfx: this.pfx,
+    key: this.key,
+    passphrase: this.passphrase,
+    cert: this.cert,
+    ca: this.ca,
+    ciphers: this.ciphers,
+    rejectUnauthorized: this.rejectUnauthorized
   });
 
   return transport;
@@ -2290,14 +2489,14 @@ Socket.prototype.filterUpgrades = function (upgrades) {
   return filteredUpgrades;
 };
 
-}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./transport":13,"./transports":14,"component-emitter":8,"debug":21,"engine.io-parser":24,"indexof":39,"parsejson":31,"parseqs":32,"parseuri":33}],13:[function(_dereq_,module,exports){
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"./transport":17,"./transports":18,"component-emitter":12,"debug":25,"engine.io-parser":28,"indexof":45,"parsejson":39,"parseqs":40,"parseuri":41}],17:[function(require,module,exports){
 /**
  * Module dependencies.
  */
 
-var parser = _dereq_('engine.io-parser');
-var Emitter = _dereq_('component-emitter');
+var parser = require('engine.io-parser');
+var Emitter = require('component-emitter');
 
 /**
  * Module exports.
@@ -2324,6 +2523,15 @@ function Transport (opts) {
   this.agent = opts.agent || false;
   this.socket = opts.socket;
   this.enablesXDR = opts.enablesXDR;
+
+  // SSL options for Node.js client
+  this.pfx = opts.pfx;
+  this.key = opts.key;
+  this.passphrase = opts.passphrase;
+  this.cert = opts.cert;
+  this.ca = opts.ca;
+  this.ciphers = opts.ciphers;
+  this.rejectUnauthorized = opts.rejectUnauthorized;
 }
 
 /**
@@ -2443,16 +2651,16 @@ Transport.prototype.onClose = function () {
   this.emit('close');
 };
 
-},{"component-emitter":8,"engine.io-parser":24}],14:[function(_dereq_,module,exports){
+},{"component-emitter":12,"engine.io-parser":28}],18:[function(require,module,exports){
 (function (global){
 /**
  * Module dependencies
  */
 
-var XMLHttpRequest = _dereq_('xmlhttprequest');
-var XHR = _dereq_('./polling-xhr');
-var JSONP = _dereq_('./polling-jsonp');
-var websocket = _dereq_('./websocket');
+var XMLHttpRequest = require('xmlhttprequest');
+var XHR = require('./polling-xhr');
+var JSONP = require('./polling-jsonp');
+var websocket = require('./websocket');
 
 /**
  * Export transports.
@@ -2499,16 +2707,16 @@ function polling(opts){
   }
 }
 
-}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./polling-jsonp":15,"./polling-xhr":16,"./websocket":18,"xmlhttprequest":19}],15:[function(_dereq_,module,exports){
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"./polling-jsonp":19,"./polling-xhr":20,"./websocket":22,"xmlhttprequest":23}],19:[function(require,module,exports){
 (function (global){
 
 /**
  * Module requirements.
  */
 
-var Polling = _dereq_('./polling');
-var inherit = _dereq_('component-inherit');
+var Polling = require('./polling');
+var inherit = require('component-inherit');
 
 /**
  * Module exports.
@@ -2640,7 +2848,7 @@ JSONPPolling.prototype.doPoll = function () {
   this.script = script;
 
   var isUAgecko = 'undefined' != typeof navigator && /gecko/i.test(navigator.userAgent);
-
+  
   if (isUAgecko) {
     setTimeout(function () {
       var iframe = document.createElement('iframe');
@@ -2736,18 +2944,18 @@ JSONPPolling.prototype.doWrite = function (data, fn) {
   }
 };
 
-}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./polling":17,"component-inherit":20}],16:[function(_dereq_,module,exports){
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"./polling":21,"component-inherit":24}],20:[function(require,module,exports){
 (function (global){
 /**
  * Module requirements.
  */
 
-var XMLHttpRequest = _dereq_('xmlhttprequest');
-var Polling = _dereq_('./polling');
-var Emitter = _dereq_('component-emitter');
-var inherit = _dereq_('component-inherit');
-var debug = _dereq_('debug')('engine.io-client:polling-xhr');
+var XMLHttpRequest = require('xmlhttprequest');
+var Polling = require('./polling');
+var Emitter = require('component-emitter');
+var inherit = require('component-inherit');
+var debug = require('debug')('engine.io-client:polling-xhr');
 
 /**
  * Module exports.
@@ -2814,6 +3022,16 @@ XHR.prototype.request = function(opts){
   opts.agent = this.agent || false;
   opts.supportsBinary = this.supportsBinary;
   opts.enablesXDR = this.enablesXDR;
+
+  // SSL options for Node.js client
+  opts.pfx = this.pfx;
+  opts.key = this.key;
+  opts.passphrase = this.passphrase;
+  opts.cert = this.cert;
+  opts.ca = this.ca;
+  opts.ciphers = this.ciphers;
+  opts.rejectUnauthorized = this.rejectUnauthorized;
+
   return new Request(opts);
 };
 
@@ -2873,6 +3091,16 @@ function Request(opts){
   this.isBinary = opts.isBinary;
   this.supportsBinary = opts.supportsBinary;
   this.enablesXDR = opts.enablesXDR;
+
+  // SSL options for Node.js client
+  this.pfx = opts.pfx;
+  this.key = opts.key;
+  this.passphrase = opts.passphrase;
+  this.cert = opts.cert;
+  this.ca = opts.ca;
+  this.ciphers = opts.ciphers;
+  this.rejectUnauthorized = opts.rejectUnauthorized;
+
   this.create();
 }
 
@@ -2889,7 +3117,18 @@ Emitter(Request.prototype);
  */
 
 Request.prototype.create = function(){
-  var xhr = this.xhr = new XMLHttpRequest({ agent: this.agent, xdomain: this.xd, xscheme: this.xs, enablesXDR: this.enablesXDR });
+  var opts = { agent: this.agent, xdomain: this.xd, xscheme: this.xs, enablesXDR: this.enablesXDR };
+
+  // SSL options for Node.js client
+  opts.pfx = this.pfx;
+  opts.key = this.key;
+  opts.passphrase = this.passphrase;
+  opts.cert = this.cert;
+  opts.ca = this.ca;
+  opts.ciphers = this.ciphers;
+  opts.rejectUnauthorized = this.rejectUnauthorized;
+
+  var xhr = this.xhr = new XMLHttpRequest(opts);
   var self = this;
 
   try {
@@ -2986,7 +3225,7 @@ Request.prototype.onData = function(data){
 
 Request.prototype.onError = function(err){
   this.emit('error', err);
-  this.cleanup();
+  this.cleanup(true);
 };
 
 /**
@@ -2995,7 +3234,7 @@ Request.prototype.onError = function(err){
  * @api private
  */
 
-Request.prototype.cleanup = function(){
+Request.prototype.cleanup = function(fromError){
   if ('undefined' == typeof this.xhr || null === this.xhr) {
     return;
   }
@@ -3006,9 +3245,11 @@ Request.prototype.cleanup = function(){
     this.xhr.onreadystatechange = empty;
   }
 
-  try {
-    this.xhr.abort();
-  } catch(e) {}
+  if (fromError) {
+    try {
+      this.xhr.abort();
+    } catch(e) {}
+  }
 
   if (global.document) {
     delete Request.requests[this.index];
@@ -3091,17 +3332,17 @@ function unloadHandler() {
   }
 }
 
-}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./polling":17,"component-emitter":8,"component-inherit":20,"debug":21,"xmlhttprequest":19}],17:[function(_dereq_,module,exports){
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"./polling":21,"component-emitter":12,"component-inherit":24,"debug":25,"xmlhttprequest":23}],21:[function(require,module,exports){
 /**
  * Module dependencies.
  */
 
-var Transport = _dereq_('../transport');
-var parseqs = _dereq_('parseqs');
-var parser = _dereq_('engine.io-parser');
-var inherit = _dereq_('component-inherit');
-var debug = _dereq_('debug')('engine.io-client:polling');
+var Transport = require('../transport');
+var parseqs = require('parseqs');
+var parser = require('engine.io-parser');
+var inherit = require('component-inherit');
+var debug = require('debug')('engine.io-client:polling');
 
 /**
  * Module exports.
@@ -3114,7 +3355,7 @@ module.exports = Polling;
  */
 
 var hasXHR2 = (function() {
-  var XMLHttpRequest = _dereq_('xmlhttprequest');
+  var XMLHttpRequest = require('xmlhttprequest');
   var xhr = new XMLHttpRequest({ xdomain: false });
   return null != xhr.responseType;
 })();
@@ -3339,16 +3580,16 @@ Polling.prototype.uri = function(){
   return schema + '://' + this.hostname + port + this.path + query;
 };
 
-},{"../transport":13,"component-inherit":20,"debug":21,"engine.io-parser":24,"parseqs":32,"xmlhttprequest":19}],18:[function(_dereq_,module,exports){
+},{"../transport":17,"component-inherit":24,"debug":25,"engine.io-parser":28,"parseqs":40,"xmlhttprequest":23}],22:[function(require,module,exports){
 /**
  * Module dependencies.
  */
 
-var Transport = _dereq_('../transport');
-var parser = _dereq_('engine.io-parser');
-var parseqs = _dereq_('parseqs');
-var inherit = _dereq_('component-inherit');
-var debug = _dereq_('debug')('engine.io-client:websocket');
+var Transport = require('../transport');
+var parser = require('engine.io-parser');
+var parseqs = require('parseqs');
+var inherit = require('component-inherit');
+var debug = require('debug')('engine.io-client:websocket');
 
 /**
  * `ws` exposes a WebSocket-compatible interface in
@@ -3356,7 +3597,7 @@ var debug = _dereq_('debug')('engine.io-client:websocket');
  * in the browser.
  */
 
-var WebSocket = _dereq_('ws');
+var WebSocket = require('ws');
 
 /**
  * Module exports.
@@ -3415,6 +3656,15 @@ WS.prototype.doOpen = function(){
   var uri = this.uri();
   var protocols = void(0);
   var opts = { agent: this.agent };
+
+  // SSL options for Node.js client
+  opts.pfx = this.pfx;
+  opts.key = this.key;
+  opts.passphrase = this.passphrase;
+  opts.cert = this.cert;
+  opts.ca = this.ca;
+  opts.ciphers = this.ciphers;
+  opts.rejectUnauthorized = this.rejectUnauthorized;
 
   this.ws = new WebSocket(uri, protocols, opts);
 
@@ -3570,9 +3820,9 @@ WS.prototype.check = function(){
   return !!WebSocket && !('__initialize' in WebSocket && this.name === WS.prototype.name);
 };
 
-},{"../transport":13,"component-inherit":20,"debug":21,"engine.io-parser":24,"parseqs":32,"ws":34}],19:[function(_dereq_,module,exports){
+},{"../transport":17,"component-inherit":24,"debug":25,"engine.io-parser":28,"parseqs":40,"ws":42}],23:[function(require,module,exports){
 // browser shim for xmlhttprequest module
-var hasCORS = _dereq_('has-cors');
+var hasCORS = require('has-cors');
 
 module.exports = function(opts) {
   var xdomain = opts.xdomain;
@@ -3608,7 +3858,7 @@ module.exports = function(opts) {
   }
 }
 
-},{"has-cors":37}],20:[function(_dereq_,module,exports){
+},{"has-cors":37}],24:[function(require,module,exports){
 
 module.exports = function(a, b){
   var fn = function(){};
@@ -3616,7 +3866,7 @@ module.exports = function(a, b){
   a.prototype = new fn;
   a.prototype.constructor = a;
 };
-},{}],21:[function(_dereq_,module,exports){
+},{}],25:[function(require,module,exports){
 
 /**
  * This is the web browser implementation of `debug()`.
@@ -3624,7 +3874,7 @@ module.exports = function(a, b){
  * Expose `debug()` as the module.
  */
 
-exports = module.exports = _dereq_('./debug');
+exports = module.exports = require('./debug');
 exports.log = log;
 exports.formatArgs = formatArgs;
 exports.save = save;
@@ -3699,7 +3949,7 @@ function formatArgs() {
   var index = 0;
   var lastC = 0;
   args[0].replace(/%[a-z%]/g, function(match) {
-    if ('%' === match) return;
+    if ('%%' === match) return;
     index++;
     if ('%c' === match) {
       // we only are interested in the *last* %c
@@ -3765,7 +4015,7 @@ function load() {
 
 exports.enable(load());
 
-},{"./debug":22}],22:[function(_dereq_,module,exports){
+},{"./debug":26}],26:[function(require,module,exports){
 
 /**
  * This is the common logic for both the Node.js and web browser
@@ -3779,7 +4029,7 @@ exports.coerce = coerce;
 exports.disable = disable;
 exports.enable = enable;
 exports.enabled = enabled;
-exports.humanize = _dereq_('ms');
+exports.humanize = require('ms');
 
 /**
  * The currently active debug mode names, and names to skip.
@@ -3864,7 +4114,7 @@ function debug(namespace) {
     var index = 0;
     args[0] = args[0].replace(/%([a-z%])/g, function(match, format) {
       // if we encounter an escaped % then don't increase the array index
-      if (match === '%') return match;
+      if (match === '%%') return match;
       index++;
       var formatter = exports.formatters[format];
       if ('function' === typeof formatter) {
@@ -3964,7 +4214,7 @@ function coerce(val) {
   return val;
 }
 
-},{"ms":23}],23:[function(_dereq_,module,exports){
+},{"ms":27}],27:[function(require,module,exports){
 /**
  * Helpers.
  */
@@ -4077,17 +4327,18 @@ function plural(ms, n, name) {
   return Math.ceil(ms / n) + ' ' + name + 's';
 }
 
-},{}],24:[function(_dereq_,module,exports){
+},{}],28:[function(require,module,exports){
 (function (global){
 /**
  * Module dependencies.
  */
 
-var keys = _dereq_('./keys');
-var sliceBuffer = _dereq_('arraybuffer.slice');
-var base64encoder = _dereq_('base64-arraybuffer');
-var after = _dereq_('after');
-var utf8 = _dereq_('utf8');
+var keys = require('./keys');
+var hasBinary = require('has-binary');
+var sliceBuffer = require('arraybuffer.slice');
+var base64encoder = require('base64-arraybuffer');
+var after = require('after');
+var utf8 = require('utf8');
 
 /**
  * Check if we are running an android browser. That requires us to use
@@ -4097,6 +4348,20 @@ var utf8 = _dereq_('utf8');
  */
 
 var isAndroid = navigator.userAgent.match(/Android/i);
+
+/**
+ * Check if we are running in PhantomJS.
+ * Uploading a Blob with PhantomJS does not work correctly, as reported here:
+ * https://github.com/ariya/phantomjs/issues/11395
+ * @type boolean
+ */
+var isPhantomJS = /PhantomJS/i.test(navigator.userAgent);
+
+/**
+ * When true, avoids using Blobs to encode payloads.
+ * @type boolean
+ */
+var dontSendBlobs = isAndroid || isPhantomJS;
 
 /**
  * Current protocol version.
@@ -4130,7 +4395,7 @@ var err = { type: 'error', data: 'parser error' };
  * Create a blob api even for blob builder when vendor prefixes exist
  */
 
-var Blob = _dereq_('blob');
+var Blob = require('blob');
 
 /**
  * Encodes a packet.
@@ -4169,6 +4434,11 @@ exports.encodePacket = function (packet, supportsBinary, utf8encode, callback) {
     return encodeBlob(packet, supportsBinary, callback);
   }
 
+  // might be an object with { base64: true, data: dataAsBase64String }
+  if (data && data.base64) {
+    return encodeBase64Object(packet, callback);
+  }
+
   // Sending data as a utf-8 string
   var encoded = packets[packet.type];
 
@@ -4180,6 +4450,12 @@ exports.encodePacket = function (packet, supportsBinary, utf8encode, callback) {
   return callback('' + encoded);
 
 };
+
+function encodeBase64Object(packet, callback) {
+  // packet data is an object { base64: true, data: dataAsBase64String }
+  var message = 'b' + exports.packets[packet.type] + packet.data.data;
+  return callback(message);
+}
 
 /**
  * Encode packet helpers for binary types
@@ -4220,7 +4496,7 @@ function encodeBlob(packet, supportsBinary, callback) {
     return exports.encodeBase64Packet(packet, callback);
   }
 
-  if (isAndroid) {
+  if (dontSendBlobs) {
     return encodeBlobAsArrayBuffer(packet, supportsBinary, callback);
   }
 
@@ -4352,8 +4628,10 @@ exports.encodePayload = function (packets, supportsBinary, callback) {
     supportsBinary = null;
   }
 
-  if (supportsBinary) {
-    if (Blob && !isAndroid) {
+  var isBinary = hasBinary(packets);
+
+  if (supportsBinary && isBinary) {
+    if (Blob && !dontSendBlobs) {
       return exports.encodePayloadAsBlob(packets, callback);
     }
 
@@ -4369,7 +4647,7 @@ exports.encodePayload = function (packets, supportsBinary, callback) {
   }
 
   function encodeOne(packet, doneCallback) {
-    exports.encodePacket(packet, supportsBinary, true, function(message) {
+    exports.encodePacket(packet, !isBinary ? false : supportsBinary, true, function(message) {
       doneCallback(null, setLengthHeader(message));
     });
   }
@@ -4646,8 +4924,8 @@ exports.decodePayloadAsBinary = function (data, binaryType, callback) {
   });
 };
 
-}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./keys":25,"after":26,"arraybuffer.slice":27,"base64-arraybuffer":28,"blob":29,"utf8":30}],25:[function(_dereq_,module,exports){
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"./keys":29,"after":30,"arraybuffer.slice":31,"base64-arraybuffer":32,"blob":33,"has-binary":34,"utf8":36}],29:[function(require,module,exports){
 
 /**
  * Gets the keys for an object.
@@ -4668,7 +4946,7 @@ module.exports = Object.keys || function keys (obj){
   return arr;
 };
 
-},{}],26:[function(_dereq_,module,exports){
+},{}],30:[function(require,module,exports){
 module.exports = after
 
 function after(count, callback, err_cb) {
@@ -4698,7 +4976,7 @@ function after(count, callback, err_cb) {
 
 function noop() {}
 
-},{}],27:[function(_dereq_,module,exports){
+},{}],31:[function(require,module,exports){
 /**
  * An abstraction for slicing an arraybuffer even when
  * ArrayBuffer.prototype.slice is not supported
@@ -4729,7 +5007,7 @@ module.exports = function(arraybuffer, start, end) {
   return result.buffer;
 };
 
-},{}],28:[function(_dereq_,module,exports){
+},{}],32:[function(require,module,exports){
 /*
  * base64-arraybuffer
  * https://github.com/niklasvh/base64-arraybuffer
@@ -4790,7 +5068,7 @@ module.exports = function(arraybuffer, start, end) {
   };
 })("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/");
 
-},{}],29:[function(_dereq_,module,exports){
+},{}],33:[function(require,module,exports){
 (function (global){
 /**
  * Create a blob builder even when vendor prefixes exist
@@ -4842,8 +5120,75 @@ module.exports = (function() {
   }
 })();
 
-}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],30:[function(_dereq_,module,exports){
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{}],34:[function(require,module,exports){
+(function (global){
+
+/*
+ * Module requirements.
+ */
+
+var isArray = require('isarray');
+
+/**
+ * Module exports.
+ */
+
+module.exports = hasBinary;
+
+/**
+ * Checks for binary data.
+ *
+ * Right now only Buffer and ArrayBuffer are supported..
+ *
+ * @param {Object} anything
+ * @api public
+ */
+
+function hasBinary(data) {
+
+  function _hasBinary(obj) {
+    if (!obj) return false;
+
+    if ( (global.Buffer && global.Buffer.isBuffer(obj)) ||
+         (global.ArrayBuffer && obj instanceof ArrayBuffer) ||
+         (global.Blob && obj instanceof Blob) ||
+         (global.File && obj instanceof File)
+        ) {
+      return true;
+    }
+
+    if (isArray(obj)) {
+      for (var i = 0; i < obj.length; i++) {
+          if (_hasBinary(obj[i])) {
+              return true;
+          }
+      }
+    } else if (obj && 'object' == typeof obj) {
+      if (obj.toJSON) {
+        obj = obj.toJSON();
+      }
+
+      for (var key in obj) {
+        if (obj.hasOwnProperty(key) && _hasBinary(obj[key])) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  return _hasBinary(data);
+}
+
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"isarray":35}],35:[function(require,module,exports){
+module.exports = Array.isArray || function (arr) {
+  return Object.prototype.toString.call(arr) == '[object Array]';
+};
+
+},{}],36:[function(require,module,exports){
 (function (global){
 /*! http://mths.be/utf8js v2.0.0 by @mathias */
 ;(function(root) {
@@ -5085,8 +5430,43 @@ module.exports = (function() {
 
 }(this));
 
-}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],31:[function(_dereq_,module,exports){
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{}],37:[function(require,module,exports){
+
+/**
+ * Module dependencies.
+ */
+
+var global = require('global');
+
+/**
+ * Module exports.
+ *
+ * Logic borrowed from Modernizr:
+ *
+ *   - https://github.com/Modernizr/Modernizr/blob/master/feature-detects/cors.js
+ */
+
+try {
+  module.exports = 'XMLHttpRequest' in global &&
+    'withCredentials' in new global.XMLHttpRequest();
+} catch (err) {
+  // if XMLHttp support is disabled in IE then it will throw
+  // when trying to create
+  module.exports = false;
+}
+
+},{"global":38}],38:[function(require,module,exports){
+
+/**
+ * Returns `this`. Execute this without a "context" (i.e. without it being
+ * attached to an object of the left-hand side), and `this` points to the
+ * "global" scope of the current JS execution.
+ */
+
+module.exports = (function () { return this; })();
+
+},{}],39:[function(require,module,exports){
 (function (global){
 /**
  * JSON parse.
@@ -5120,8 +5500,8 @@ module.exports = function parsejson(data) {
     return (new Function('return ' + data))();
   }
 };
-}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],32:[function(_dereq_,module,exports){
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{}],40:[function(require,module,exports){
 /**
  * Compiles a querystring
  * Returns string representation of the object
@@ -5160,7 +5540,7 @@ exports.decode = function(qs){
   return qry;
 };
 
-},{}],33:[function(_dereq_,module,exports){
+},{}],41:[function(require,module,exports){
 /**
  * Parses an URI
  *
@@ -5201,7 +5581,7 @@ module.exports = function parseuri(str) {
     return uri;
 };
 
-},{}],34:[function(_dereq_,module,exports){
+},{}],42:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -5246,14 +5626,14 @@ function ws(uri, protocols, opts) {
 
 if (WebSocket) ws.prototype = WebSocket.prototype;
 
-},{}],35:[function(_dereq_,module,exports){
+},{}],43:[function(require,module,exports){
 (function (global){
 
 /*
  * Module requirements.
  */
 
-var isArray = _dereq_('isarray');
+var isArray = require('isarray');
 
 /**
  * Module exports.
@@ -5295,7 +5675,7 @@ function hasBinary(data) {
       }
 
       for (var key in obj) {
-        if (obj.hasOwnProperty(key) && _hasBinary(obj[key])) {
+        if (Object.prototype.hasOwnProperty.call(obj, key) && _hasBinary(obj[key])) {
           return true;
         }
       }
@@ -5307,48 +5687,10 @@ function hasBinary(data) {
   return _hasBinary(data);
 }
 
-}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"isarray":36}],36:[function(_dereq_,module,exports){
-module.exports = Array.isArray || function (arr) {
-  return Object.prototype.toString.call(arr) == '[object Array]';
-};
-
-},{}],37:[function(_dereq_,module,exports){
-
-/**
- * Module dependencies.
- */
-
-var global = _dereq_('global');
-
-/**
- * Module exports.
- *
- * Logic borrowed from Modernizr:
- *
- *   - https://github.com/Modernizr/Modernizr/blob/master/feature-detects/cors.js
- */
-
-try {
-  module.exports = 'XMLHttpRequest' in global &&
-    'withCredentials' in new global.XMLHttpRequest();
-} catch (err) {
-  // if XMLHttp support is disabled in IE then it will throw
-  // when trying to create
-  module.exports = false;
-}
-
-},{"global":38}],38:[function(_dereq_,module,exports){
-
-/**
- * Returns `this`. Execute this without a "context" (i.e. without it being
- * attached to an object of the left-hand side), and `this` points to the
- * "global" scope of the current JS execution.
- */
-
-module.exports = (function () { return this; })();
-
-},{}],39:[function(_dereq_,module,exports){
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"isarray":44}],44:[function(require,module,exports){
+module.exports=require(35)
+},{"/home/ghoststreet/Not Work/webrtc/node_modules/socket.io-client/node_modules/engine.io-client/node_modules/engine.io-parser/node_modules/has-binary/node_modules/isarray/index.js":35}],45:[function(require,module,exports){
 
 var indexOf = [].indexOf;
 
@@ -5359,7 +5701,7 @@ module.exports = function(arr, obj){
   }
   return -1;
 };
-},{}],40:[function(_dereq_,module,exports){
+},{}],46:[function(require,module,exports){
 
 /**
  * HOP ref.
@@ -5444,7 +5786,7 @@ exports.length = function(obj){
 exports.isEmpty = function(obj){
   return 0 == exports.length(obj);
 };
-},{}],41:[function(_dereq_,module,exports){
+},{}],47:[function(require,module,exports){
 /**
  * Parses an URI
  *
@@ -5471,7 +5813,7 @@ module.exports = function parseuri(str) {
   return uri;
 };
 
-},{}],42:[function(_dereq_,module,exports){
+},{}],48:[function(require,module,exports){
 (function (global){
 /*global Blob,File*/
 
@@ -5479,8 +5821,8 @@ module.exports = function parseuri(str) {
  * Module requirements
  */
 
-var isArray = _dereq_('isarray');
-var isBuf = _dereq_('./is-buffer');
+var isArray = require('isarray');
+var isBuf = require('./is-buffer');
 
 /**
  * Replaces every Buffer | ArrayBuffer in packet with a numbered placeholder.
@@ -5615,19 +5957,19 @@ exports.removeBlobs = function(data, callback) {
   }
 };
 
-}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./is-buffer":44,"isarray":45}],43:[function(_dereq_,module,exports){
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"./is-buffer":50,"isarray":51}],49:[function(require,module,exports){
 
 /**
  * Module dependencies.
  */
 
-var debug = _dereq_('debug')('socket.io-parser');
-var json = _dereq_('json3');
-var isArray = _dereq_('isarray');
-var Emitter = _dereq_('component-emitter');
-var binary = _dereq_('./binary');
-var isBuf = _dereq_('./is-buffer');
+var debug = require('debug')('socket.io-parser');
+var json = require('json3');
+var isArray = require('isarray');
+var Emitter = require('component-emitter');
+var binary = require('./binary');
+var isBuf = require('./is-buffer');
 
 /**
  * Protocol version.
@@ -5859,7 +6201,7 @@ Decoder.prototype.add = function(obj) {
       this.reconstructor = new BinaryReconstructor(packet);
 
       // no attachments, labeled binary but no binary data to follow
-      if (this.reconstructor.reconPack.attachments == 0) {
+      if (this.reconstructor.reconPack.attachments === 0) {
         this.emit('decoded', packet);
       }
     } else { // non-binary full packet
@@ -5900,11 +6242,15 @@ function decodeString(str) {
 
   // look up attachments if type binary
   if (exports.BINARY_EVENT == p.type || exports.BINARY_ACK == p.type) {
-    p.attachments = '';
+    var buf = '';
     while (str.charAt(++i) != '-') {
-      p.attachments += str.charAt(i);
+      buf += str.charAt(i);
+      if (i + 1 == str.length) break;
     }
-    p.attachments = Number(p.attachments);
+    if (buf != Number(buf) || str.charAt(i) != '-') {
+      throw new Error('Illegal attachments');
+    }
+    p.attachments = Number(buf);
   }
 
   // look up namespace (if any)
@@ -5922,7 +6268,7 @@ function decodeString(str) {
 
   // look up id
   var next = str.charAt(i + 1);
-  if ('' != next && Number(next) == next) {
+  if ('' !== next && Number(next) == next) {
     p.id = '';
     while (++i) {
       var c = str.charAt(i);
@@ -6014,7 +6360,7 @@ function error(data){
   };
 }
 
-},{"./binary":42,"./is-buffer":44,"component-emitter":8,"debug":9,"isarray":45,"json3":46}],44:[function(_dereq_,module,exports){
+},{"./binary":48,"./is-buffer":50,"component-emitter":12,"debug":13,"isarray":51,"json3":52}],50:[function(require,module,exports){
 (function (global){
 
 module.exports = isBuf;
@@ -6030,10 +6376,10 @@ function isBuf(obj) {
          (global.ArrayBuffer && obj instanceof ArrayBuffer);
 }
 
-}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],45:[function(_dereq_,module,exports){
-module.exports=_dereq_(36)
-},{}],46:[function(_dereq_,module,exports){
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{}],51:[function(require,module,exports){
+module.exports=require(35)
+},{"/home/ghoststreet/Not Work/webrtc/node_modules/socket.io-client/node_modules/engine.io-client/node_modules/engine.io-parser/node_modules/has-binary/node_modules/isarray/index.js":35}],52:[function(require,module,exports){
 /*! JSON v3.2.6 | http://bestiejs.github.io/json3 | Copyright 2012-2013, Kit Cambridge | http://kit.mit-license.org */
 ;(function (window) {
   // Convenience aliases.
@@ -6896,7 +7242,7 @@ module.exports=_dereq_(36)
   }
 }(this));
 
-},{}],47:[function(_dereq_,module,exports){
+},{}],53:[function(require,module,exports){
 module.exports = toArray
 
 function toArray(list, index) {
@@ -6911,442 +7257,131 @@ function toArray(list, index) {
     return array
 }
 
-},{}]},{},[1])
-(1)
-});
+},{}],54:[function(require,module,exports){
+"use strict";
 
-var Icecomm = function(APIKEY, appSettings) {
-  var eventsObj = {};
-  var socket = io.connect('https://server.icecomm.io:443');
-  var localPeerConnections = {};
-  var dataChannels = {};
-  var remoteStreams = {};
-  var dataChannelOptions ={
-    ordered: false,
-    maxRetransmitTime: 3000
-  };
-  var optionalRtpDataChannels = {
-      optional: [
-      {
-        RtpDataChannels: true
-      },
-      {
-        DtlsSrtpKeyAgreement: true
-      },
-      ]
-  };
-  var debugMode = false;
-  var timeToConnect;
-  var localStream, myID, currentRoom, currentDomain, isHost, browserType;
+var _createClass = (function () { function defineProperties(target, props) { for (var key in props) { var prop = props[key]; prop.configurable = true; if (prop.value) prop.writable = true; } Object.defineProperties(target, props); } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
 
-  /////////////////////////////////////////////////////////////////////////////////////////////////
+var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } };
 
-  checkDebugMode();
-  assignBrowser();
+var _commonHelpers = require("../../common/helpers");
 
-  /////////////////////////////////////////////////////////////////////////////////////////////////
+var id = _commonHelpers.id;
+var log = _commonHelpers.log;
+var reportError = _commonHelpers.reportError;
 
-  this.send = function(data, callerID) {
-    if (callerID === undefined){
-      for (var callerID in localPeerConnections) {
-        dataChannels[callerID].send(JSON.stringify(data));
-      }
-    }
-    else if (callerID) {
-      dataChannels[callerID].send(JSON.stringify(data));
-    }
-  }
+// Reference Constants
 
-  this.on = function(event, callback) {
-    if (!eventsObj[event]) {
-      eventsObj[event] = [];
-    }
-    eventsObj[event].push(callback);
-  }
+var iceConfig = {
+    iceServers: []
+};
 
-  this.connect = function(room, settings) {
-    timeToConnect = Date.now();
-    var roomSettings = createRoomSettings(settings);
-    currentRoom = room;
-    for (var callerID in remoteStreams) {
-      remoteStreams[callerID].stop();
+//
+// Peer Class
+//
+
+var Peer = (function () {
+    function Peer(info, λ) {
+        _classCallCheck(this, Peer);
+
+        this.id = info.id;
+        this.username = info.username;
+        this.meta = info.meta || {};
+        this.pc = new webkitRTCPeerConnection(iceConfig);
+
+        // Send any candidates we find to whom it may concern
+        this.pc.onicecandidate = function (event) {
+            if (!event || !event.candidate) {} else {
+                //log('Local candidate:', event.candidate.sdpMLineIndex, event.candidate.sdpMid);
+                log("Peer::constructor - Local candidate generated");
+                λ(event.candidate);
+            }
+        };
     }
 
-    checkSettingsBeforeCall(roomSettings);
-  }
-
-  this.getLocalID = function() {
-    return myID;
-  }
-
-  this.getRemoteIDs = function() {
-    var remoteIDs = [];
-    for (var i = 0; i < currentDomain[currentRoom].length; i ++) {
-      if (currentDomain[currentRoom][i] !== myID) {
-        remoteIDs.push(currentDomain[currentRoom][i]);
-      }
-    }
-
-    return remoteIDs;
-  }
-
-  this.getRooms = function() {
-    var rooms = [];
-    for (var room in currentDomain) {
-      rooms.push(room);
-    }
-
-    return rooms;
-  }
-
-  this.getRoomSize = function() {
-    return currentDomain[currentRoom].length;
-  }
-
-  this.isHost = function() {
-    return isHost;
-  }
-
-  this.getDomain = function(){
-    return currentDomain;
-  }
-
-  this.close = function() {
-    localStream.stop();
-  }
-
-  this.getPing = function() {
-    return timeToConnect;
-  }
-
-  /////////////////////////////////////////////////////////////////////////////////////////////////
-
-  socket.on('problem', errorHandler);
-
-  socket.on('domain', function(domain) {
-    currentDomain = domain;
-  });
-
-  socket.on('left', function(callerID) {
-    var options = {};
-    options.callerID = callerID;
-    removePeer(callerID);
-    trigger('disconnect', options);
-  });
-
-  socket.on('join', function(IDPacket) {
-    timeToConnect = Date.now() - timeToConnect;
-    var otherIDs = IDPacket.otherIDs;
-    myID = IDPacket.myID;
-    isHost = false;
-
-    printDebugMesasge('otherIDs on join ' + otherIDs);
-
-    if (otherIDs.length === 0) {
-      isHost = true;
-    }
-
-    for (var i = 0; i < otherIDs.length; i++) {
-      call(otherIDs[i], IDPacket.roomSettings, IDPacket.serverInfo);
-    }
-  });
-
-  socket.on('offer', function(descriptionObj) {
-
-    // Check to make sure offer is for this client
-    if (myID === descriptionObj.to) {
-      offerEvent(descriptionObj.from, descriptionObj.description, descriptionObj.roomSettings, descriptionObj.serverInfo);
-    }
-  });
-
-  socket.on('answer', function(descriptionObj) {
-
-    // Check if message is for this client
-    if (descriptionObj.to === myID) {
-      answerEvent(descriptionObj.from, descriptionObj.description);
-    }
-  });
-
-  socket.on('candidate', function(candidateObj) {
-    var callerID = candidateObj.from;
-
-    // Check if message is for this client
-    if (myID === candidateObj.to) {
-      var candidate = new RTCIceCandidate({
-        sdpMLineIndex: candidateObj.label,
-        candidate: candidateObj.candidate
-      });
-      localPeerConnections[callerID].addIceCandidate(candidate, function() {
-        printDebugMesasge('success on setting candidate');
-      }, errorHandler);
-    }
-  });
-
-  /////////////////////////////////////////////////////////////////////////////////////////////////
-
-  function createRoomSettings(settings) {
-    var roomSettings = {};
-    roomSettings.stream = true;
-    roomSettings.constraints = {video: true, audio: true};
-
-    if (settings && settings.stream === false) {
-      roomSettings.stream = false;
-    }
-    if (settings && settings.limit) {
-      roomSettings.limit = settings.limit;
-    }
-    if (settings && settings.video === false) {
-      roomSettings.constraints.video = false;
-    }
-    if (settings && settings.audio === false) {
-      roomSettings.constraints.audio = false;
-    }
-
-    return roomSettings;
-  }
-
-  function checkSettingsBeforeCall(roomSettings) {
-
-    // Gets media stream if paramter and no current localstream
-    if (roomSettings.stream && (!localStream || localStream.ended)) {
-      navigator.getUserMedia(roomSettings.constraints, function(stream) {
-        gotStreamSuccess(stream, roomSettings);
-      }, errorHandler);
-    } else {
-      joinRoom(roomSettings);
-    }
-  }
-
-  function joinRoom(roomSettings) {
-    var roomInfo = {
-      room: currentRoom,
-      apiKey: APIKEY,
-      roomSettings: roomSettings,
-      roomLimit: roomSettings.limit
-    }
-
-    socket.emit('leave');
-    socket.emit('join', roomInfo);
-  }
-
-  function answerEvent(callerID, remoteDescription) {
-    printDebugMesasge('receive answer from ' + callerID);
-    var answer = new RTCSessionDescription(remoteDescription);
-    localPeerConnections[callerID].setRemoteDescription(answer, function() {
-      printDebugMesasge('answer successful');
-    }, errorHandler);
-  }
-
-  function offerEvent(callerID, remoteDescription, roomSettings, serverInfo) {
-    createPeerConnections(callerID, serverInfo);
-
-    if (roomSettings.stream) {
-      localPeerConnections[callerID].addStream(localStream);
-    }
-
-    var offer = new RTCSessionDescription(remoteDescription);
-    localPeerConnections[callerID].setRemoteDescription(offer, function() {
-      localPeerConnections[callerID].createAnswer(function(localDescription) {
-        printDebugMesasge('offer success, creating answer');
-        createDescription(localDescription, callerID, roomSettings, 'answer');
-      }, errorHandler);
-    }, errorHandler);
-  }
-
-  function gotStreamSuccess(stream, roomSettings) {
-    localStream = stream;
-
-    // fill local user video
-    var options = createStreamOptions('local');
-
-    trigger('local', options);
-    joinRoom(roomSettings);
-  }
-
-  function call(callerID, roomSettings, serverInfo) {
-    createPeerConnections(callerID, serverInfo);
-
-    if (roomSettings.stream) {
-      localPeerConnections[callerID].addStream(localStream);
-    }
-    localPeerConnections[callerID].createOffer(function(description) {
-        createDescription(description, callerID, roomSettings, 'offer', serverInfo);
-      }, errorHandler);
-  }
-
-  function createPeerConnections(callerID, serverInfo) {
-    localPeerConnections[callerID] = new RTCPeerConnection(serverInfo, optionalRtpDataChannels);
-
-    createDataChannels(callerID);
-
-    localPeerConnections[callerID].onicecandidate = function (event) {
-      iceCandidateHandler(callerID, event.candidate);
-    };
-
-    localPeerConnections[callerID].onaddstream = function gotRemoteStream(event){
-      addRemoteStream(callerID, event.stream);
-    };
-
-    localPeerConnections[callerID].onnegotiationneeded = negotiationNeededHandler;
-  }
-
-  function createDataChannels(callerID) {
-    dataChannels[callerID] = localPeerConnections[callerID].createDataChannel('RTCDataChannel', {reliable: true});
-
-    dataChannels[callerID].onerror = errorHandler;
-
-    dataChannels[callerID].onmessage = function(event) {
-      messageDataHandler(callerID, event.data)
-    }
-
-    dataChannels[callerID].onopen = function(event) {
-      openDataHandler(callerID);
-    }
-
-    dataChannels[callerID].onclose = closeDataHandler
-  }
-
-  function addRemoteStream(callerID, stream) {
-    remoteStreams[callerID] = stream;
-  }
-
-  function messageDataHandler(callerID, data) {
-    var options = {};
-    options.data = JSON.parse(data);
-    options.callerID = callerID;
-    trigger('data', options);
-  }
-
-  function openDataHandler(callerID) {
-    var options = createStreamOptions('remote', callerID);
-    trigger('connected', options);
-  }
-
-  function createDescription(description, callerID, roomSettings, offerOrAnswer, serverInfo) {
-    var descriptionObj = {
-      description: description,
-      from: myID,
-      roomSettings: roomSettings,
-      to: callerID
-    };
-
-    if (offerOrAnswer === 'offer') {
-      descriptionObj.serverInfo = serverInfo;
-    }
-
-    localPeerConnections[callerID].setLocalDescription(description, function() {
-      printDebugMesasge('sending ' + offerOrAnswer + ' to ' + callerID);
-      socket.emit(offerOrAnswer, descriptionObj);
-    }, errorHandler);
-  }
-
-  function closeDataHandler() {
-    printDebugMessage('ON CLOSE CALLED');
-  }
-
-  function iceCandidateHandler(callerID, candidate) {
-    if (candidate) {
-      var candidateObj = {
-        label: candidate.sdpMLineIndex,
-        from: myID,
-        to: callerID,
-        candidate: candidate.candidate
-      };
-
-      socket.emit('candidate', candidateObj);
-    }
-  }
-
-  function negotiationNeededHandler() {
-    printDebugMesasge('on negotiationNeededHandler');
-  }
-
-  function errorHandler(err){
-    printDebugMesasge('Error ' + err);
-  }
-
-  function trigger(event, options) {
-    if (eventsObj[event]) {
-      options = options || {};
-      for (var i = 0; i < eventsObj[event].length; i++) {
-        eventsObj[event][i](options);
-      }
-    }
-  }
-
-  function createStreamOptions(localOrRemote, ID) {
-    var options = {};
-    var stream;
-
-    if (localOrRemote === 'local') {
-      var audiolessStream = new MediaStream(localStream.getVideoTracks());
-      options.myID = myID;
-      stream = audiolessStream;
-      // stream = localStream;
-      ID = myID;
-    }
-    if (localOrRemote === 'remote') {
-      options.callerID = ID;
-      stream = remoteStreams[ID];
-    }
-    options.stream = URL.createObjectURL(stream);
-    options.rawStream = stream;
-    options.video = createVideoElement(ID, stream);
-
-    return options;
-  }
-
-  function createVideoElement(ID, stream) {
-    var tempVideo = document.createElement('video');
-    tempVideo.src = URL.createObjectURL(stream);
-    tempVideo.id = ID;
-    tempVideo.autoplay = true;
-    return tempVideo;
-  }
-
-  function removePeer(callerID) {
-    for (var ID in remoteStreams) {
-      if (ID === callerID) {
-        delete remoteStreams[ID];
-      }
-    }
-  }
-
-  function printDebugMesasge(message) {
-    if (debugMode) {
-      console.log(message);
-    }
-  }
-
-  function checkDebugMode() {
-    if (appSettings && appSettings.debug === true) {
-      debugMode = true;
-    }
-  }
-
-  // function parseDescription(description) {
-  //   if (browserType === "Mozilla") {
-  //     if (description.sdp.match('m=application 9 RTP/SAVPF ')) {
-  //       description.sdp = description.sdp.replace('m=application 9 RTP/SAVPF ', 'm=application 9 RTP/SAVPF');
-  //     }
-  //   }
-  //   if (browserType === "Chrome") {
-  //     if (!description.sdp.match('m=application 9 RTP/SAVPF ')) {
-  //       description.sdp = description.sdp.replace('m=application 9 RTP/SAVPF', 'm=application 9 RTP/SAVPF ');
-  //     }
-  //   }
-
-  //   return description;
-  // }
-
-  function assignBrowser() {
-    if (navigator.mozGetUserMedia) {
-      browserType = 'Mozilla';
-    }
-
-    if (navigator.webkitGetUserMedia) {
-      browserType = "Chrome";
-    }
-  }
-
-}
+    _createClass(Peer, {
+        getInfo: {
+            value: function getInfo() {
+                return {
+                    id: this.id,
+                    username: this.username,
+                    meta: this.meta
+                };
+            }
+        },
+        saveIceCandidate: {
+            value: function saveIceCandidate(candidate) {
+                // Candidates must only be acknowledged if remoteDescription is set
+                if (this.pc && this.pc.remoteDescription) {
+                    try {
+                        this.pc.addIceCandidate(new RTCIceCandidate(candidate));
+                    } catch (e) {
+                        console.error(this.pc);
+                        throw e;
+                    }
+                }
+            }
+        },
+        setRemoteDescription: {
+            value: function setRemoteDescription(sdp, λ) {
+                if (this.pc) {
+                    this.pc.setRemoteDescription(new RTCSessionDescription(sdp), λ);
+                }
+            }
+        },
+        dispatchOffer: {
+            value: function dispatchOffer(λ) {
+                var _this = this;
+
+                this.pc.createOffer(function (sessionDescription) {
+                    _this.pc.setLocalDescription(sessionDescription);
+                    λ(sessionDescription);
+                }, reportError, {
+                    mandatory: {
+                        OfferToReceiveAudio: true,
+                        OfferToReceiveVideo: true
+                    }
+                });
+            }
+        },
+        dispatchAnswer: {
+            value: function dispatchAnswer(sdp, λ) {
+                var _this = this;
+
+                this.setRemoteDescription(sdp, function () {
+                    log("Creating set remote desc...");
+                    _this.pc.createAnswer(function (sessionDescription) {
+                        _this.pc.setLocalDescription(sessionDescription);
+                        log("Creating answer...", sessionDescription);
+                        λ(sessionDescription);
+                    }, reportError, {
+                        mandatory: {
+                            OfferToReceiveAudio: true,
+                            OfferToReceiveVideo: true
+                        }
+                    });
+                }, reportError);
+            }
+        }
+    }, {
+        Zero: {
+            value: function Zero() {
+                return {
+                    id: "0",
+                    username: "ZeroUser",
+                    isZeroUser: true,
+                    saveIceCandidate: id,
+                    setRemoteDescription: id
+                };
+            }
+        }
+    });
+
+    return Peer;
+})();
+
+module.exports = Peer;
+
+// reportError(('No ICE candidate:', event);
+
+},{"../../common/helpers":3}]},{},[1]);
