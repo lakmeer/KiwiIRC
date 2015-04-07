@@ -3,7 +3,6 @@
  */
 
 var serverURL = location.protocol + '//' + location.hostname;
-var username  = location.hash ? location.hash.replace('#', '') : 'Anon';
 
 // Helpers
 var log = function () {
@@ -18,6 +17,33 @@ var id = function () {
     return arguments[0];
 };
 
+
+_kiwi.view.VideoCollectionView = Backbone.View.extend({
+
+  el: '',
+  initialise: function (options) {
+      console.log(options);
+      this.model = options.collection;
+
+      this.model.on('add', this.appendNew);
+      this.model.on('chenge', function () {
+        console.log(this, arguments);
+      });
+  },
+
+  render: function () {
+
+  },
+
+  appendNew: function () {
+    console.log('appending:', this, arguments);
+  }
+});
+
+
+// TODO: Remove this
+window.KIWI = _kiwi;
+
 _kiwi.model.VideoChat = Backbone.Model.extend({
     initialize: function (options) {
         // set view here
@@ -28,9 +54,23 @@ _kiwi.model.VideoChat = Backbone.Model.extend({
         this.remoteVideos = new Backbone.Collection([], { model: _kiwi.model.Video });
         this.view = new _kiwi.view.VideoChat({"model": this});
 
-        this.room = new P2PRoom(options.channelName, serverURL + ":8081");
-        this.room.on('peerConnected', this.peerConnected);
-        this.room.on('peerDisconnected', this.peerDisconnected);
+        var remoteVideosView = new _kiwi.view.VideoCollectionView({ collection: this.remoteVideos });
+
+        // Listen for connection to be ready
+        _kiwi.app.connections.on('active', function (panel, connection) {
+            this.updateUsername(connection);
+            this.room = new P2PRoom(options.channelName, serverURL + ":8081");
+            this.room.on('peerConnected', this.peerConnected.bind(this));
+            this.room.on('peerDisconnected', this.peerDisconnected.bind(this));
+        }, this);
+    },
+
+    createRoom: function (serverURL) {
+    },
+
+    updateUsername: function (connection) {
+        this.username = connection.get('nick');
+        // TODO: Whatever is needed
     },
 
     peerConnected: function (peer) {
@@ -40,34 +80,30 @@ _kiwi.model.VideoChat = Backbone.Model.extend({
             case "audio":
             case "video":
                 if (this.localVideo) {
-                    peer.pc.addStream(this.localVideo.stream);
+                    peer.pc.addStream(this.localVideo.attributes.stream);
                 }
 
-                var video = new Video(peer.username);
+                console.log(peer);
+
+                var video = new _kiwi.model.Video({ username: peer.username, type: peer.meta.type, isLocal: false });
+
                 peer.pc.onaddstream = function (event) {
                     console.debug('onaddstream for peer:', peer.username, event.stream.id);
                     video.attachStream(event.stream);
                 };
 
-                video.appendTo(remoteContainer);
+                this.remoteVideos.add(video);
                 this.peerVideoMap[peer.id] = video;
-
-                if (peer.meta.type === 'audio') {
-                    video.showAudioOnly();
-                }
-
                 break;
 
             case "spectator":
                 if (this.localVideo) {
-                    peer.pc.addStream(this.localVideo.stream);
+                    peer.pc.addStream(this.localVideo.attributes.stream);
                 }
 
-                var video = new Video(peer.username);
-                video.showNoSignal();
-                video.appendTo(remoteContainer);
+                var video = new _kiwi.model.Video({ username: peer.username, type: peer.meta.type, isLocal: false });
+                this.remoteVideos.add(video);
                 this.peerVideoMap[peer.id] = video;
-
                 break;
 
             default:
@@ -97,9 +133,6 @@ _kiwi.model.VideoChat = Backbone.Model.extend({
 
     joinVideo: function () {
         this.createLocalVideo('mi');
-
-        console.log(this.localVideo, this.attributes);
-
         log('models::VideoChat::joinVideo');
         navigator.webkitGetUserMedia({ video: true, audio: false }, this.onUserMedia('video'), reportError);
     },
@@ -107,7 +140,6 @@ _kiwi.model.VideoChat = Backbone.Model.extend({
     joinAudio: function () {
         log('models::VideoChat::joinAudio');
         this.createLocalVideo('mi', 'audio');
-
         navigator.webkitGetUserMedia({ video: false, audio: true }, this.onUserMedia('audio'), reportError);
     },
 
@@ -115,11 +147,11 @@ _kiwi.model.VideoChat = Backbone.Model.extend({
         log('models::VideoChat::leave');
         for (var peerId in this.peerVideoMap) {
             var video = this.peerVideoMap[peerId];
-            remoteContainer.removeChild(video.dom.main);
+            this.remoteVideos.remove(video);
             delete this.peerVideoMap[peerId];
         }
         if (this.localVideo) {
-            this.localVideo.dom.main.parentNode.removeChild(this.localVideo.dom.main);
+            this.localVideo.remove();
         }
         this.localVideo = undefined;
         this.room.leave();

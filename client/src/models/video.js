@@ -11,6 +11,11 @@ _kiwi.model.Video = Backbone.Model.extend({
 
     attachStream: function (stream) {
         this.set('stream', stream);
+    },
+
+    remove: function () {
+      this.view.remove();
+      this.view.unbind();
     }
 });
 

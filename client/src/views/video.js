@@ -3,13 +3,17 @@
  */
 _kiwi.view.Video = Backbone.View.extend({
     tagName: "div",
+
     initialize: function (options) {
         //this.model.bind('change', this.render, this);
         this.model.bind('change:stream', this.attachStream, this);
         this.render();
     },
+
     render: function () {
         var $this = this.$el;
+
+        if (this.streamAttached) { return; }
 
         $this.html('<div class="video"><p class="name"> {{name}} </p><video></video></div>');
         this.video = $this.find('video')[0];
@@ -43,6 +47,7 @@ _kiwi.view.Video = Backbone.View.extend({
     },
 
     attachStream: function (model) {
+        this.streamAttached = true;
         this.video.src = URL.createObjectURL(model.attributes.stream);
         this.waitUntilReady();
     },
