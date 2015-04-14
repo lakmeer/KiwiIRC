@@ -51,7 +51,7 @@ _kiwi.model.VideoChat = Backbone.Model.extend({
         console.log(options);
 
         this.peerVideoMap = {};
-        this.set('connectionStatus', 'Disconnected');
+        this.set('connectionStatus', 'disconnected');
         this.remoteVideos = new Backbone.Collection([], { model: _kiwi.model.Video });
         this.view = new _kiwi.view.VideoChat({"model": this});
 
@@ -155,7 +155,7 @@ _kiwi.model.VideoChat = Backbone.Model.extend({
             this.localVideo.remove();
         }
         this.localVideo = undefined;
-        this.set('connectionStatus', 'Disconnected');
+        this.set('connectionStatus', 'disconnected');
         this.room.leave();
     },
 
@@ -164,7 +164,7 @@ _kiwi.model.VideoChat = Backbone.Model.extend({
             console.log('onUserMedia: ', stream);
             this.localVideo.attachStream(stream);
             log('Attempting to join room, type: ', type);
-            this.set('connectionStatus', type === 'audio' ? "Audio Only" : "Connected");
+            this.set('connectionStatus', type);
             this.room.join(this.username, { type: type });
         }).bind(this);
     },

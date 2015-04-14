@@ -414,13 +414,26 @@
     <script type="text/html" id="tmpl_videochat">
         <div class="remoteVideos">
         </div>
-        <div class="controls">
+        <div class="meta">
             <p class="title">vidni tavla</p>
-            <p class="status"><%= connectionStatus %></p>
-            <button data-action="join-video"><i class="fa fa-video-camera"></i> Join with Video</button>
-            <button data-action="join-audio"><i class="fa fa-microphone"></i> Join with Audio </button>
-            <button data-action="spectate"><i class="fa fa-eye"></i> Spectate </button>
-            <button data-action="leave"><i class="fa fa-close"></i> Leave </button>
+            <p class="status <%= connectionStatus %>">
+              <% switch (connectionStatus) {
+                case "disconnected": %> Disconnected <% break;
+                case "video":        %> Connected <% break;
+                case "audio":        %> Audio Only <% break;
+                case "spectating":   %> Spectating <% break;
+                default: %> Unknown <%
+              } %>
+            </p>
+            <div class="controls">
+                <% if (connectionStatus === 'disconnected') { %>
+                    <button data-action="join-video"><i class="fa fa-video-camera"></i> Join with Video</button>
+                    <button data-action="join-audio"><i class="fa fa-microphone"></i> Join with Audio </button>
+                    <button data-action="spectate"><i class="fa fa-eye"></i> Spectate </button>
+                <% } else { %>
+                    <button data-action="leave"><i class="fa fa-close"></i> Leave </button>
+                <% } %>
+            </div>
         </div>
         <div class="localVideo">
         </div>

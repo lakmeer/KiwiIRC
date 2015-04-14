@@ -610,37 +610,33 @@ html, body { height:100%; }
  *
  */
 
-#kiwi .medialist {
+#kiwi .videochat {
 
 }
 
-#kiwi .medialist .meta {
+#kiwi .videochat .meta {
   margin: 0;
   text-align: center;
-
 }
 
-#kiwi .medialist .meta .title {
+#kiwi .videochat .meta .title {
   font-weight: bold;
   font-size: 1.2em;
   margin-top: 0;
   margin-bottom: 0.5em;
 }
 
-#kiwi .medialist .meta .status {
+#kiwi .videochat .meta .status {
   font-size: 0.9em;
-}
-
-#kiwi .medialist .meta .status.no-rx-no-tx {
   color: #900;
 }
 
-#kiwi .medialist .meta .video-tools {
+#kiwi .videochat .meta .video-tools {
   padding: 10px 0;
   font-size: 1.6em;
 }
 
-#kiwi .medialist .meta button {
+#kiwi .videochat .meta button {
   margin: 0 2px;
   color: white;
   background: #cf8b54;
