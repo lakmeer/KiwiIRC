@@ -15,7 +15,9 @@ _kiwi.view.Video = Backbone.View.extend({
 
         if (this.streamAttached) { return; }
 
-        $this.html('<div class="video"><p class="name"> {{name}} </p><video></video></div>');
+        var tmpl = $('#tmpl_video').html();
+        console.log(this.model);
+        this.$el.html(_.template(tmpl, this.model.attributes));
         this.video = $this.find('video')[0];
 
         if (this.model.attributes.isLocal) {

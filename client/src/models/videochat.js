@@ -51,6 +51,7 @@ _kiwi.model.VideoChat = Backbone.Model.extend({
         console.log(options);
 
         this.peerVideoMap = {};
+        this.set('connectionStatus', 'Disconnected');
         this.remoteVideos = new Backbone.Collection([], { model: _kiwi.model.Video });
         this.view = new _kiwi.view.VideoChat({"model": this});
 
@@ -117,8 +118,8 @@ _kiwi.model.VideoChat = Backbone.Model.extend({
         console.debug('PEER LOST', peer);
         var video = this.peerVideoMap[peer.id];
         if (!video) { return; }
+        this.remoteVideos.remove(video);
         delete this.peerVideoMap[peer.id];
-        remoteContainer.removeChild(video.dom.main);
     },
 
 
@@ -154,6 +155,7 @@ _kiwi.model.VideoChat = Backbone.Model.extend({
             this.localVideo.remove();
         }
         this.localVideo = undefined;
+        this.set('connectionStatus', 'Disconnected');
         this.room.leave();
     },
 
@@ -162,6 +164,7 @@ _kiwi.model.VideoChat = Backbone.Model.extend({
             console.log('onUserMedia: ', stream);
             this.localVideo.attachStream(stream);
             log('Attempting to join room, type: ', type);
+            this.set('connectionStatus', type === 'audio' ? "Audio Only" : "Connected");
             this.room.join(this.username, { type: type });
         }).bind(this);
     },

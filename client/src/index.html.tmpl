@@ -411,6 +411,30 @@
     </script>
 
 
+    <script type="text/html" id="tmpl_videochat">
+        <div class="remoteVideos">
+        </div>
+        <div class="controls">
+            <p class="title">vidni tavla</p>
+            <p class="status"><%= connectionStatus %></p>
+            <button data-action="join-video"><i class="fa fa-video-camera"></i> Join with Video</button>
+            <button data-action="join-audio"><i class="fa fa-microphone"></i> Join with Audio </button>
+            <button data-action="spectate"><i class="fa fa-eye"></i> Spectate </button>
+            <button data-action="leave"><i class="fa fa-close"></i> Leave </button>
+        </div>
+        <div class="localVideo">
+        </div>
+    </script>
+
+
+    <script type="text/html" id="tmpl_video">
+        <div class="video">
+            <p class="name"> <%= username %> </p>
+            <video></video>
+        </div>
+    </script>
+
+
 <script src="<%base_path%>/assets/libs/jquery-1.11.1.min.js"></script>
 <script>
 /* Script loader (https://github.com/ded/script.js) */
