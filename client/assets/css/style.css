@@ -628,6 +628,10 @@ html, body { height:100%; }
 
 #kiwi .videochat .meta .status {
   font-size: 0.9em;
+  color: #090;
+}
+
+#kiwi .videochat .meta .status.disconnected {
   color: #900;
 }
 
@@ -637,8 +641,76 @@ html, body { height:100%; }
 }
 
 #kiwi .videochat .meta button {
-  margin: 0 2px;
+  margin: 0 2px 4px;
+  background: #555;
   color: white;
-  background: #cf8b54;
+}
+
+
+/* Video widget */
+
+#kiwi .videochat .video {
+  position: relative;
+}
+
+#kiwi .videochat .video video {
+  display: block;
+  max-width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+#kiwi .videochat .video .name {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  z-index: 2;
+  padding: 5px;
+  color: white;
+  text-shadow: 0 0 5px black;
+  font-family: Helvetica, sans-serif;
+  font-weight: 100;
+}
+
+#kiwi .videochat .video.local {
+    margin-bottom: 10px;
+}
+
+#kiwi .videochat .video.local video {
+    -webkit-transform: scale(-1, 1);
+    -moz-transform: scale(-1, 1);
+    -ms-transform: scale(-1, 1);
+    transform: scale(-1, 1);
+}
+
+#kiwi .videochat .video.audio-only {
+    background: black;
+}
+
+#kiwi .videochat .video.spectator {
+    background: #555;
+}
+
+#kiwi .videochat .video.audio-only video,
+#kiwi .videochat .video.spectator video {
+    display: none;
+}
+
+#kiwi .videochat .video.audio-only .name,
+#kiwi .videochat .video.spectator .name {
+    position: relative;
+}
+
+#kiwi .videochat .video.audio-only .audio-icon,
+#kiwi .videochat .video.spectator .spectator-icon {
+    display: block !important;
+    position: absolute;
+    top: 0;
+    right: 5px;
+    color: white;
+    line-height: 30px;
+    font-size: 1.5em;
+    text-align: center;
+    text-shadow: 0 0 20px black;
 }
 

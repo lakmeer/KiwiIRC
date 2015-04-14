@@ -80,14 +80,11 @@ _kiwi.model.VideoChat = Backbone.Model.extend({
         switch (peer.meta.type) {
             case "audio":
             case "video":
-                if (this.localVideo) {
+                if (this.localVideo && this.localVideo.attributes.stream) {
                     peer.pc.addStream(this.localVideo.attributes.stream);
                 }
 
-                console.log(peer);
-
                 var video = new _kiwi.model.Video({ username: peer.username, type: peer.meta.type, isLocal: false });
-
                 peer.pc.onaddstream = function (event) {
                     console.debug('onaddstream for peer:', peer.username, event.stream.id);
                     video.attachStream(event.stream);
@@ -98,7 +95,7 @@ _kiwi.model.VideoChat = Backbone.Model.extend({
                 break;
 
             case "spectator":
-                if (this.localVideo) {
+                if (this.localVideo && this.localVideo.attributes.stream) {
                     peer.pc.addStream(this.localVideo.attributes.stream);
                 }
 
@@ -129,6 +126,8 @@ _kiwi.model.VideoChat = Backbone.Model.extend({
 
     spectate: function () {
         log('models::VideoChat::spectate');
+        this.set('connectionStatus', 'spectator');
+        this.createLocalVideo('mi', 'spectator');
         this.room.join(this.username, { type: 'spectator' });
     },
 

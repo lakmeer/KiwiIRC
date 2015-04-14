@@ -2,7 +2,8 @@
  * Created by ghoststreet on 3/24/15.
  */
 _kiwi.view.Video = Backbone.View.extend({
-    tagName: "div",
+
+    className: 'video',
 
     initialize: function (options) {
         //this.model.bind('change', this.render, this);
@@ -16,7 +17,6 @@ _kiwi.view.Video = Backbone.View.extend({
         if (this.streamAttached) { return; }
 
         var tmpl = $('#tmpl_video').html();
-        console.log(this.model);
         this.$el.html(_.template(tmpl, this.model.attributes));
         this.video = $this.find('video')[0];
 
@@ -28,12 +28,15 @@ _kiwi.view.Video = Backbone.View.extend({
             this.showAudioOnly();
         }
 
+        if (this.model.attributes.type === 'spectator') {
+            this.showSpectator();
+        }
+
         return this;
     },
 
     markLocal: function () {
-        this.video.style.transform = 'scale(-1, 1)';
-        this.el.style.border = '2px solid blue';
+        this.$el.addClass('local');
     },
 
     waitUntilReady: function () {
@@ -55,12 +58,10 @@ _kiwi.view.Video = Backbone.View.extend({
     },
 
     showAudioOnly: function () {
-        this.video.style.opacity = 0;
-        this.el.style.background = 'blue';
-    }/*,
+        this.$el.addClass('audio-only');
+    },
 
-    showNoSignal: function () {
-        this.video.style.opacity = 0;
-        this.el.style.background = 'red';
-    }*/
+    showSpectator: function () {
+        this.$el.addClass('spectator');
+    }
 });

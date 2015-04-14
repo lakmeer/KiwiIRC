@@ -412,8 +412,6 @@
 
 
     <script type="text/html" id="tmpl_videochat">
-        <div class="remoteVideos">
-        </div>
         <div class="meta">
             <p class="title">vidni tavla</p>
             <p class="status <%= connectionStatus %>">
@@ -421,30 +419,30 @@
                 case "disconnected": %> Disconnected <% break;
                 case "video":        %> Connected <% break;
                 case "audio":        %> Audio Only <% break;
-                case "spectating":   %> Spectating <% break;
+                case "spectator":    %> Spectating <% break;
                 default: %> Unknown <%
               } %>
             </p>
             <div class="controls">
                 <% if (connectionStatus === 'disconnected') { %>
-                    <button data-action="join-video"><i class="fa fa-video-camera"></i> Join with Video</button>
-                    <button data-action="join-audio"><i class="fa fa-microphone"></i> Join with Audio </button>
+                    <button data-action="join-video"><i class="fa fa-video-camera"></i> Video</button>
+                    <button data-action="join-audio"><i class="fa fa-microphone"></i> Audio </button>
                     <button data-action="spectate"><i class="fa fa-eye"></i> Spectate </button>
                 <% } else { %>
                     <button data-action="leave"><i class="fa fa-close"></i> Leave </button>
                 <% } %>
             </div>
         </div>
-        <div class="localVideo">
-        </div>
+        <div class="localVideo"> </div>
+        <div class="remoteVideos"> </div>
     </script>
 
 
     <script type="text/html" id="tmpl_video">
-        <div class="video">
-            <p class="name"> <%= username %> </p>
-            <video></video>
-        </div>
+        <p class="name"> <%= username %> </p>
+        <video></video>
+        <div style="display:none" class="audio-icon"> <i class="fa fa-volume-up"></i> </div>
+        <div style="display:none" class="spectator-icon"> <i class="fa fa-eye"></i> </div>
     </script>
 
 

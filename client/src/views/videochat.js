@@ -22,13 +22,13 @@ _kiwi.view.VideoChat = Backbone.View.extend({
 
     render: function () {
         this.$el.html( _.template( $('#tmpl_videochat').html(), this.model.attributes ));
-
-        if (this.model.localVideo) {
-            this.model.localVideo.view.$el.appendTo( this.$el );
-        }
-
         this.$localVideo   = this.$el.find('.localVideo');
         this.$remoteVideos = this.$el.find('.remoteVideos');
+
+        if (this.model.localVideo) {
+            this.model.localVideo.view.$el.appendTo( this.$localVideo );
+        }
+
         return this;
     },
 
