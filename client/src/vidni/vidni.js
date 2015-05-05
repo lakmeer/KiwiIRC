@@ -28,13 +28,13 @@ var Peer = _interopRequire(require("./peer"));
 // - Similarly for leaving
 // - Check for duplicate peers
 
-window.P2PRoom = (function () {
-    function P2PRoom(name, serverURL) {
+var P2PRoom = (function () {
+    function P2PRoom(name, config) {
         _classCallCheck(this, P2PRoom);
 
         this.options = {
             name: name,
-            serverURL: serverURL
+            config: config
         };
         this.state = {
             needsSettingUp: true,
@@ -45,7 +45,7 @@ window.P2PRoom = (function () {
             peerDisonnected: id,
             joinError: id
         };
-        this.socket = io.connect(serverURL);
+        this.socket = io.connect(config.signalServer.hostname + ":" + config.signalServer.port);
     }
 
     _createClass(P2PRoom, {
@@ -164,7 +164,7 @@ window.P2PRoom = (function () {
             value: function createNewPeer(peerInfo) {
                 var _this = this;
 
-                var peer = new Peer(peerInfo, function (candidate) {
+                var peer = new Peer(peerInfo, this.options.config.iceServers, function (candidate) {
                     return _this.socket.emit("candidate", candidate);
                 });
                 this.state.peers.push(peer);
@@ -7270,24 +7270,22 @@ var id = _commonHelpers.id;
 var log = _commonHelpers.log;
 var reportError = _commonHelpers.reportError;
 
-// Reference Constants
+// RTCPeerConnection cascade
 
-var iceConfig = {
-    iceServers: []
-};
+var PeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection;
 
 //
 // Peer Class
 //
 
 var Peer = (function () {
-    function Peer(info, λ) {
+    function Peer(info, iceConfig, λ) {
         _classCallCheck(this, Peer);
 
         this.id = info.id;
         this.username = info.username;
         this.meta = info.meta || {};
-        this.pc = new webkitRTCPeerConnection(iceConfig);
+        this.pc = new PeerConnection(iceConfig);
 
         // Send any candidates we find to whom it may concern
         this.pc.onicecandidate = function (event) {

@@ -22,9 +22,7 @@ _kiwi.view.VideoCollectionView = Backbone.View.extend({
 
   el: '',
   initialise: function (options) {
-      console.log(options);
       this.model = options.collection;
-
       this.model.on('add', this.appendNew);
       this.model.on('chenge', function () {
         console.log(this, arguments);
@@ -57,10 +55,14 @@ _kiwi.model.VideoChat = Backbone.Model.extend({
 
         var remoteVideosView = new _kiwi.view.VideoCollectionView({ collection: this.remoteVideos });
 
+        if (!_kiwi.app.server_settings.client.vidni) {
+          throw new Error('No Vidni config found in KiwiIRC config block. Check config.js and rebuild.');
+        }
+
         // Listen for connection to be ready
         _kiwi.app.connections.on('active', function (panel, connection) {
             this.updateUsername(connection);
-            this.room = new P2PRoom(options.channelName, serverURL + ":8081");
+            this.room = new P2PRoom(options.channelName, _kiwi.app.server_settings.client.vidni);
             this.room.on('peerConnected', this.peerConnected.bind(this));
             this.room.on('peerDisconnected', this.peerDisconnected.bind(this));
         }, this);
