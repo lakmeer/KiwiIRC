@@ -611,3 +611,11 @@
   background: #cf8b54;
 }
 
+video {
+  max-width: 100%;
+}
+
+.videochat .disabled, .videochat [disabled] {
+  background: grey !important;
+}
+
